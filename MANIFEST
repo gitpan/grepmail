@@ -99,3 +99,7 @@ t/results/test39.stdout.real          Correct STDOUT output file
 t/results/test39.stderr.real          Correct STDERR output file
 t/results/test40.stdout.real          Correct STDOUT output file
 t/results/test40.stderr.real          Correct STDERR output file
+t/results/test41.stdout.real          Correct STDOUT output file
+t/results/test41.stderr.real          Correct STDERR output file
+t/results/test42.stdout.real          Correct STDOUT output file
+t/results/test42.stderr.real          Correct STDERR output file

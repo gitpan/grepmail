@@ -1,3 +1,19 @@
+New in version 4.46:
+- Fixed a bug in -u message id processing. (Thanks go to an anonymous bug
+  reporter on SourceForge.)
+- Added more workarounds to prevent warnings resulting from a bug in Perl 5.6
+  (Thanks to Joey Hess <joey@kitenet.net>)
+- Added -Z flag to tell grepmail not to use Mail::Folder::FastReader even if
+  it is installed.
+- Fixed a bug introduced in version 4.44 where -m would not work unless used
+  with -n. (Thanks to Imre Simon <is@ime.usp.br> for catching this.)
+- --help anywhere on the command line now causes the help to be printed,
+  instead of only when used as the first argument.
+- Test script now exercises both the Mail::Folder::FastReader and perl mailbox
+  implementations as appropriate.
+- Restructured code to separate out Perl mailbox implementation as
+  Mail::Folder::SlowReader. (This module is embedded in the grepmail script.)
+
 New in version 4.45:
 - Added -n and -V to usage message. (Thanks to Wolfgang Rohdewald
   <WRohdewald@dplanet.ch> for catching this.)
@@ -5,6 +21,7 @@ New in version 4.45:
 - A blank line before the start of an email is not required now. This
   allows broken folders created by Netscape to be read. (Thanks to Jeremy
   Malcolm <terminus@terminus.net.au> for the bug report.)
+- Mail::FastReader is 8% faster.
 
 New in version 4.44:
 - execution with -M flag now 35% faster

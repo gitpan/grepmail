@@ -4,38 +4,27 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
+New in version 4.46:
+- Fixed a bug in -u message id processing. (Thanks go to an anonymous bug
+  reporter on SourceForge.)
+- Added more workarounds to prevent warnings resulting from a bug in Perl 5.6
+  (Thanks to Joey Hess <joey@kitenet.net>)
+- Added -Z flag to tell grepmail not to use Mail::Folder::FastReader even if
+  it is installed.
+- Fixed a bug introduced in version 4.44 where -m would not work unless used
+  with -n. (Thanks to Imre Simon <is@ime.usp.br> for catching this.)
+- --help anywhere on the command line now causes the help to be printed,
+  instead of only when used as the first argument.
+- Test script now exercises both the Mail::Folder::FastReader and perl mailbox
+  implementations as appropriate.
+- Restructured code to separate out Perl mailbox implementation as
+  Mail::Folder::SlowReader. (This module is embedded in the grepmail script.)
+
 New in version 4.45:
 - Added -n and -V to usage message.
 - Added workarounds to prevent warnings resulting from a bug in Perl 5.6
 - A blank line before the start of an email is not required now. This
   allows broken folders created by Netscape to be read.
-
-New in version 4.44:
-- execution with -M flag now 35% faster
-- Added a Mail::Folder::FastReader module which can cause grepmail to
-  run 10-50% faster, depending on your system. Since this module is
-  experimental, the installation script will allow you to not install
-  the module. A C compiler is required.
-- "-----Original Message-----" now recognized as beginning an included
-  message
-- Fixed a bug where errors would not be displayed if compressed data
-  was piped to grepmail
-- Date::Parse is now only required if -d is used. (Date::Manip is
-  still only required if you use complex date specfications.)
-- Added -n flag to print line numbers a la grep
-- Fixed a bug in debug output where the email subject was actually the
-  sender
-- Fixed an undefined value in the printing of flag information
-- An ASCII file is now determined to be a mailbox if it has a line
-  whose prefix is 'From' or 'X-From-Line:', and another line whose
-  prefix is 'Received ', 'Date:', 'Subject:', 'X-Status:', or
-  'Status:'.
-- Error exits now return 1
-- -V flag prints the version
-- Fixed a bug in -r counting when used with -h.
-- Fixed a bug in the handling of included messages.
-- Restructured code: localized reading of the emails from the file,
-  removed two functions
 
 See the file CHANGES for a complete change history and credits.
 
