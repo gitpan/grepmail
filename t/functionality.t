@@ -64,14 +64,22 @@ my $tzip = 0;
 
 {
   my $temp;
-  $temp = `bzip2 -h 2>&1`;
+
+  # Save old STDERR and redirect temporarily to nothing
+  use vars qw(*OLDSTDERR);
+  open OLDSTDERR,">&STDERR" or die "Can't save STDOUT: $!\n";
+  open STDERR,">/dev/null" or die "Can't redirect STDOUT to /dev/null: $!\n";
+
+  $temp = `bzip2 -h`;
   $bzip2 = 1 if $temp =~ /usage/;
 
-  $temp = `gzip -h 2>&1`;
+  $temp = `gzip -h`;
   $gzip = 1 if $temp =~ /usage/;
 
-  $temp = `tzip -h 2>&1`;
+  $temp = `tzip -h`;
   $tzip = 1 if $temp =~ /usage/;
+
+  open STDERR,">&OLDSTDERR" or die "Can't restore STDOUT: $!\n";
 }
 
 print "Testing $version version of grepmail.\n";

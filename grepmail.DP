@@ -2,11 +2,12 @@
 
 # grepmail
 
-$VERSION = 4.20;
+$VERSION = 4.22;
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
-# supports piped compressed or ascii input, and searches constrained by date. 
+# supports piped compressed or ascii input, and searches constrained by date
+# and size. 
 
 # Visit the grepmail project homepage at http://grepmail.sourceforge.net/
 # There you can join the announcements mailing list to be notified of updates,
@@ -91,28 +92,9 @@ $VERSION = 4.20;
 
 require 5.00396;
 
-use vars qw(%opts $pattern $commandLine $VERSION);
+use vars qw(%opts $pattern $commandLine $VERSION $DEBUG);
 
 use Getopt::Std;
-
-# We need to do this early to check for the -D flag when setting the DEBUG
-# constant
-BEGIN
-{
-  $commandLine = "$0 @ARGV";
-
-  # Print usage error if no arguments given
-  print "No arguments given. grepmail -h for help.\n" and exit if (!@ARGV);
-
-  # So we don't have to test whether they are defined later.
-  $opts{'D'} = $opts{'d'} = $opts{'e'} = $opts{'i'} = $opts{'q'} = 0;
-  $opts{'h'} = $opts{'b'} = $opts{'v'} = $opts{'l'} = $opts{'r'} = 0;
-  $opts{'M'} = $opts{'m'} = $opts{'s'} = 0;
-
-  getopt("eds",\%opts);
-}
-
-use constant DEBUG => $opts{'D'} || 0;
 
 use strict;
 use FileHandle;
@@ -125,7 +107,7 @@ use Carp;
 
 sub dprint
 {
-  return 1 unless DEBUG;
+  return 1 unless $DEBUG;
 
   my $message = join '',@_;
 
@@ -154,6 +136,20 @@ sub cleanExit
 }
 
 #-------------------------------------------------------------------------------
+
+$commandLine = "$0 @ARGV";
+
+# So we don't have to test whether they are defined later.
+$opts{'D'} = $opts{'d'} = $opts{'e'} = $opts{'i'} = $opts{'q'} = 0;
+$opts{'h'} = $opts{'b'} = $opts{'v'} = $opts{'l'} = $opts{'r'} = 0;
+$opts{'M'} = $opts{'m'} = $opts{'s'} = 0;
+
+# Print usage error if no arguments given
+print "No arguments given. grepmail -h for help.\n" and exit if (!@ARGV);
+
+getopt("eds",\%opts);
+
+$DEBUG = $opts{'D'} || 0;
 
 dprint "Command line was:";
 dprint "  $commandLine";
@@ -203,7 +199,7 @@ elsif (!$opts{'e'} && !$opts{'d'} && !$opts{'s'})
   $pattern = shift @ARGV;
 }
 
-if (DEBUG)
+if ($DEBUG)
 {
   dprint "Options are:";
   foreach my $i (sort keys %opts)
@@ -264,12 +260,13 @@ dprint "FILES: @ARGV\n";
 dprint "DATE RESTRICTION: $dateRestriction\n";
 dprint "SIZE RESTRICTION: $opts{'s'}\n";
 
-# Catch everything I can...
-$SIG{PIPE} = \&cleanExit;
-$SIG{HUP} = \&cleanExit;
-$SIG{INT} = \&cleanExit;
-$SIG{QUIT} = \&cleanExit;
-$SIG{TERM} = \&cleanExit;
+# Catch everything I can... We have to localize these to prevent odd bugs from
+# cropping up (see changelog).
+local $SIG{PIPE} = \&cleanExit;
+local $SIG{HUP} = \&cleanExit;
+local $SIG{INT} = \&cleanExit;
+local $SIG{QUIT} = \&cleanExit;
+local $SIG{TERM} = \&cleanExit;
 
 my @files = GetFiles(@ARGV);
 
@@ -352,6 +349,7 @@ sub HandleInputFiles
     }
 
     my $fileHandle = new FileHandle;
+    my ($filter,$filterError);
 
     # If it's not a compressed file
     if ($file !~ /\.(gz|Z|bz2|tz)$/)
@@ -362,28 +360,85 @@ sub HandleInputFiles
         next;
       }
 
-      $fileHandle->open($file) || cleanExit "Can't open $file";
+      unless ($fileHandle->open($file))
+      {
+        warn "** Can't open $file: $!, skipping **\n" unless $opts{'q'};
+        next;
+      }
     }
     # If it is a tzipped file
     elsif ($file =~ /\.tz$/)
     {
       dprint "Calling tzip to decompress file.";
-      $fileHandle->open("tzip -cd '$file'|") 
-        or cleanExit "Can't execute tzip for file $file";
+
+      $filter = 'tzip';
+
+      use vars qw(*OLDSTDERR);
+      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open STDERR,">/dev/null"
+        or die "Can't redirect STDERR to /dev/null: $!\n";
+
+      unless ($fileHandle->open("tzip -cd '$file'|"))
+      {
+        $filterError = $!;
+      }
+
+      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
       dprint "Calling gunzip to decompress file.";
-      $fileHandle->open("gunzip -c '$file'|")
-        or cleanExit "Can't execute gunzip for file $file";
+
+      $filter = 'gunzip';
+
+      use vars qw(*OLDSTDERR);
+      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open STDERR,">/dev/null"
+        or die "Can't redirect STDERR to /dev/null: $!\n";
+
+      unless ($fileHandle->open("gunzip -c '$file'|"))
+      {
+        $filterError = $!;
+      }
+
+      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
       dprint "Calling bzip2 to decompress file.";
-      $fileHandle->open("bzip2 -dc '$file'|")
-        or cleanExit "Can't execute bzip2 for file $file";
+
+      $filter = 'bzip2';
+
+      use vars qw(*OLDSTDERR);
+      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open STDERR,">/dev/null"
+        or die "Can't redirect STDERR to /dev/null: $!\n";
+
+      unless ($fileHandle->open("bzip2 -dc '$file'|"))
+      {
+        $filterError = $!;
+      }
+
+      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
+    }
+
+    if ($filterError)
+    {
+      warn "** Can't execute \"$filter\" for file \"$file\": $filterError, ".
+           "skipping **\n" unless $opts{'q'};
+      next;
+    }
+
+    unless (DataOnFileHandle($fileHandle))
+    {
+      unless ($fileHandle->close())
+      {
+        warn "** Can't execute \"$filter\" for file \"$file\": $!, ".
+             "skipping **\n" unless $opts{'q'};
+      }
+      next;
     }
 
     if (!IsMailbox($fileHandle))
@@ -393,6 +448,7 @@ sub HandleInputFiles
     }
 
     ProcessMailFile($fileHandle,$file);
+
     $fileHandle->close();
   }
 }
@@ -453,15 +509,27 @@ sub HandleStandardInput
     }
 
     # Here we invoke another copy of grepmail with a filter in front.
+    use vars qw(*OLDSTDERR);
+    open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+    open STDERR,">/dev/null"
+      or die "Can't redirect STDERR to /dev/null: $!\n";
+
     my $newGrepmail = new FileHandle;
     $newGrepmail->open("|$filter|$commandLine")
-      or cleanExit "Can't execute '$filter' on stdin";
+      or warn "** Can't execute \"$filter\" on STDIN: $! **\n"
+        unless $opts{'q'};
+
+    open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
+
     while (!eof $fileHandle)
     {
       my $temp = <$fileHandle>;
       print $newGrepmail $temp;
     }
-    close $newGrepmail;
+
+    $newGrepmail->close()
+      or warn "** Can't execute \"$filter\" on STDIN: $! **\n"
+        unless $opts{'q'};
   }
   # Otherwise process it directly
   else
@@ -474,6 +542,20 @@ sub HandleStandardInput
 
     ProcessMailFile($fileHandle,"Standard input");
   }
+}
+
+#-------------------------------------------------------------------------------
+
+# Checks to see if there is data on a filehandle, without reading that data.
+
+sub DataOnFileHandle
+{
+  my $fileHandle = shift;
+
+  my $buffer = <$fileHandle>;
+  PutBackString($fileHandle,$buffer);
+
+  return $buffer ? 1 : 0;
 }
 
 #-------------------------------------------------------------------------------
@@ -504,7 +586,7 @@ sub IsMailbox
   # Read whole paragraphs
   local $/ = "\n\n";
 
-  # Read a paragraph to get the header. (If we have to.)
+  # Read a paragraph to get the header.
   my $buffer = <$fileHandle>;
 
   my $returnVal;
@@ -556,6 +638,7 @@ sub ProcessMailFile ($$)
     if (!defined $next_header)
     {
       dprint "Getting header for first email.";
+
       $header_buffer = <$fileHandle>;
     }
     else
@@ -566,7 +649,7 @@ sub ProcessMailFile ($$)
       undef $next_header;
     }
 
-    PrintEmailStatistics($header_buffer) if DEBUG;
+    PrintEmailStatistics($header_buffer) if $DEBUG;
 
     #----------------------------------------------------------------
 
@@ -577,7 +660,7 @@ sub ProcessMailFile ($$)
     if ($result eq 'skip')
     {
       dprint "Doing an early abort based on header.";
-      SkipToNextEmail($fileHandle,\$next_header);
+      SkipToNextEmail($fileHandle,\$next_header,$fileName);
       next;
     }
     elsif ($result eq 'print')
@@ -594,11 +677,11 @@ sub ProcessMailFile ($$)
       elsif ($opts{'r'})
       {
         $numberOfMatches++;
-        SkipToNextEmail($fileHandle,\$next_header);
+        SkipToNextEmail($fileHandle,\$next_header,$fileName);
       }
       else
       {
-        GetRestOfBody($fileHandle,\$body_buffer,\$next_header);
+        GetRestOfBody($fileHandle,\$body_buffer,\$next_header,$fileName);
         PrintEmail($fileName,$header_buffer,$body_buffer);
         next;
       }
@@ -610,7 +693,7 @@ sub ProcessMailFile ($$)
 
     dprint "Reading body.";
 
-    GetRestOfBody($fileHandle,\$body_buffer,\$next_header);
+    GetRestOfBody($fileHandle,\$body_buffer,\$next_header,$fileName);
 
     my $matchesBody;
 
@@ -650,7 +733,7 @@ sub ProcessMailFile ($$)
     if ($isMatch == 0 && !$opts{'v'})
     {
       dprint "Doing an early abort based on header+body.";
-      SkipToNextEmail($fileHandle,\$next_header);
+      SkipToNextEmail($fileHandle,\$next_header,$fileName);
       next;
     }
     elsif ($isMatch == 0 && $opts{'v'})
@@ -667,11 +750,11 @@ sub ProcessMailFile ($$)
       elsif ($opts{'r'})
       {
         $numberOfMatches++;
-        SkipToNextEmail($fileHandle,\$next_header);
+        SkipToNextEmail($fileHandle,\$next_header,$fileName);
       }
       else
       {
-        GetRestOfBody($fileHandle,\$body_buffer,\$next_header);
+        GetRestOfBody($fileHandle,\$body_buffer,\$next_header,$fileName);
         PrintEmail($fileName,$header_buffer,$body_buffer);
         next;
       }
@@ -682,7 +765,7 @@ sub ProcessMailFile ($$)
     $isMatch = 1;
     
     my $matchesDate = CheckDate(\$header_buffer);
-    $isMatch = 0 if  $opts{'d'} && !$matchesDate;
+    $isMatch = 0 if $opts{'d'} && !$matchesDate;
 
     $isMatch = !$isMatch if $opts{'v'};
 
@@ -824,10 +907,11 @@ sub AnalyzeHeader(\$$\$$)
 
 #-------------------------------------------------------------------------------
 
-sub SkipToNextEmail($\$)
+sub SkipToNextEmail($\$$)
 {
   my $fileHandle = shift;
   my $next_header = shift;
+  my $fileName = shift;
   my $paragraph;
 
   dprint "Skipping to next email.";
@@ -848,11 +932,12 @@ sub SkipToNextEmail($\$)
 
 #-------------------------------------------------------------------------------
 
-sub GetRestOfBody($\$\$)
+sub GetRestOfBody($\$\$$)
 {
   my $fileHandle = shift;
   my $body_buffer = shift;
   my $next_header = shift;
+  my $fileName = shift;
 
   return if defined $$next_header;
 

@@ -1,10 +1,20 @@
+New in version 4.22:
+- grepmail now behaves better when tzip, bzip2 or gunzip aren't present on the
+  system.
+- The code has been restructured to compile more easily with perlcc.
+
+New in version 4.21:
+- Fixed a bug that would cause grepmail to runaway when a pipe following it
+  was broken. (Thanks to Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at> for the
+  bug report)
+
 New in version 4.20:
 - grepmail development has been moved to SourceForge, and made public. Visit
   http://grepmail.sourceforge.net/
 - Added -s flag, which limits matched emails to a given size
 - Restructured the code to be more robust with respect to feature interaction.
   (At a 5-10% slowdown cost.)
-- Fixed an uninitialized variable warning caused emails without subjects in
+- Fixed an uninitialized variable warning caused by emails without subjects in
   debug mode.
 
 New in version 4.11:

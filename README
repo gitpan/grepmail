@@ -2,22 +2,17 @@ grepmail - search mailboxes for a particular email
 
 Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
-allowed, and date restrictions are supported.
+allowed, and date and size restrictions are supported.
 
-New in version 4.20:
-- grepmail development has been moved to SourceForge, and made public. Visit
-  http://grepmail.sourceforge.net/
-- Added -s flag, which limits matched emails to a given size
-- Restructured the code to be more robust with respect to feature interaction.
-  (At a 5-10% slowdown cost.)
-- Fixed an uninitialized variable warning caused emails without subjects in
-  debug mode.
+New in version 4.22:
+- grepmail now behaves better when tzip, bzip2 or gunzip aren't present on the
+  system.
+- The code has been restructured to compile more easily with perlcc.
 
-New in version 4.11:
-- Fixed a bug where an ASCII file would not be recognized as a mailbox when
-  the first couple emails did not have a "From:" line. (Thanks to Jeff Flowers
-  <jeff.flowers@npl.co.uk>)
-- Added standard Perl testing.
+New in version 4.21:
+- Fixed a bug that would cause grepmail to runaway when a pipe following it
+  was broken. (Thanks to Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at> for the
+  bug report
 
 See the file CHANGES for a complete change history.
 
@@ -37,6 +32,10 @@ On Non-Windows systems:
   % make test
   % make install
 
+If make test fails, please run "perl t/functionality.t" and see which test(s)
+are failing. Please email the output of running the particular test with the
+-D flag to the address below.
+
 On Windows systems:
 - Just pick which one you like, and rename it to "grepmail"
 - Do "perldoc grepmail" for documentation
@@ -51,11 +50,6 @@ discussion forums, CVS access, and more.
 AUTHOR
 
 Written by David Coppit (david@coppit.org, http://coppit.org/)
-
-Please send any enhancements, questions, or suggestions you have.  Also send
-me email if you would like to be notified of updates.  I have a suite of tests
-that I can give you if you ask. Keep in mind that I'm likely to turn down
-obscure features to avoid including everything but the kitchen sink.
 
 
 LICENSE
