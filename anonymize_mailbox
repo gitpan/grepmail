@@ -134,7 +134,31 @@ while(1)
 
   my ($header,$body) = $email =~ /(.*?\n\n)(.*)/s;
 
+
   $body =~ s/\w/X/g;
+
+
+  {
+    my ($header_to) = $header =~ /^To: (.*)$/m;
+    my ($header_subject) = $header =~ /^Subject: (.*)$/m;
+
+    if (defined $header_to)
+    {
+      my $modified_header_to = $header_to;
+      $modified_header_to =~ s/\w/X/g;
+
+      $header =~ s/To: \Q$header_to\E/To: $modified_header_to/g;
+    }
+
+    if (defined $header_subject)
+    {
+      my $modified_header_subject = $header_subject;
+      $modified_header_subject =~ s/\w/X/g;
+
+      $header =~ s/Subject: \Q$header_subject\E/Subject: $modified_header_subject/g;
+    }
+  }
+
 
   print $header,$body;
 }

@@ -1,3 +1,18 @@
+New in version 4.72:
+- 20% speed improvement in the Perl mailbox parser (By terry jones
+  <terry@eatoni.com>)
+- Fixed a number of potential bugs in command line processing and date
+  processing. (By terry jones <terry@eatoni.com>)
+- Cleaned up return values and use of quotes in the code. (By terry jones
+  <terry@eatoni.com>)
+- Fixed a bug in -X signature processing (By terry jones <terry@eatoni.com>)
+- Modified anonymize_mailbox to anonymize To: and Subject: in the header.
+  (Thanks to terry jones <terry@eatoni.com> for the idea.)
+- Fixed a bug in FastReader where emails less than 255 characters in size
+  would occasionally cause a core dump. (Thanks to terry jones
+  <terry@eatoni.com> for submitting a bug report and sample mailbox.)
+- Made "big" test mailboxes 4 times bigger for more meaningful speed tests
+
 New in version 4.71:
 - Fixed warning about SIGHUP on Windows.
 - Fixed -u functionality for emails without the Message-Id header. (Thanks to
