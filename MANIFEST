@@ -19,6 +19,7 @@ t/mailarc-2.txt                       Input file
 t/mailarc-2.txt.gz                    Input file
 t/mailarc-2.txt.tz                    Input file
 t/mailarc-2.txt.bz2                   Input file
+t/mailarc-3.txt                       Input file
 t/directory/mailarc-2.txt             Input file
 t/results/test1.stdout.real           Correct STDOUT output file
 t/results/test1.stderr.real           Correct STDERR output file
@@ -134,3 +135,5 @@ t/results/test56.stdout.real          Correct STDOUT output file
 t/results/test56.stderr.real          Correct STDERR output file
 t/results/test57.stdout.real          Correct STDOUT output file
 t/results/test57.stderr.real          Correct STDERR output file
+t/results/test58.stdout.real          Correct STDOUT output file
+t/results/test58.stderr.real          Correct STDERR output file

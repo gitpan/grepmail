@@ -1,3 +1,16 @@
+New in version 4.71:
+- Fixed warning about SIGHUP on Windows.
+- Fixed -u functionality for emails without the Message-Id header. (Thanks to
+  Felix E. Klee <felix.klee@inka.de> for finding the bug.) NOTE: grepmail will
+  use Digest::MD5 to compute a hash for the email header. If you don't have
+  Digest::MD5, grepmail will just store the header. So, the default tradeoff
+  is time for space.
+- Fixed a bug in the test script. (Thanks to Joey Hess <joey@kitenet.net> for
+  finding and fixing the bug.)
+- Extended workaround for spurious warning about undefined variable to Perl
+  5.8. (Thanks to Joey Hess <joey@kitenet.net> for reporting the ongoing
+  heisenbug.)
+
 New in version 4.7:
 - Fixed signal handling to make grepmail easier to debug. Thanks to Ilya
   Zakharevich for providing the solution.
