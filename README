@@ -1,8 +1,16 @@
-grepmail version 3.5
+grepmail version 3.6
 
 Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 and returns those emails that match it. Piped input is allowed, and date
 restrictions are supported.
+
+New in version 3.6:
+- No more temporary files! This addresses the security issues that a few
+  people have sent me email about. The new version uses a bit more memory,
+  depending on the size of the largest email in your mailbox. It's quite a bit
+  faster for piped input, though. Many thanks go to Joey Hess who supplied
+  insights and contributions toward making this release happen, especially the
+  buffering code.
 
 New in version 3.5:
 - grepmail will not try to decompress piped input that is empty.
@@ -10,11 +18,6 @@ New in version 3.5:
   privacy attacks (or in the directory specified by the TMPDIR environment
   variable, if it exists).
 - Fixed a bug that would occasionally leave a tempfile around.
-
-New in version 3.4.1: Fixed a bug that added an extra line to the start of
-output.
-
-New in version 3.4: Added tzip support. Reordered flags to better match grep.
 
 Written by David Coppit (coppit@cs.virginia.edu,
   http://www.cs.virginia.edu/~dwc3q/index.html)

@@ -1,4 +1,4 @@
-#!/usr/cs/bin/perl -w
+#!/usr/bin/perl -w
 
 # use perl                                  -*- mode: Perl; -*-
 eval 'exec perl -S $0 "$@"'
@@ -10,7 +10,7 @@ use constant DEBUG => 0;
 
 require 5.00396;
 
-# grepmail version 3.5
+# grepmail version 3.6
 
 # Grepmail searches a normal, gzip'd, or bzip2'd mailbox for a given regular
 # expression and returns those emails that match the query. It also supports
@@ -36,6 +36,15 @@ require 5.00396;
 
 # Version History (major changes only)
 
+# 3.6 Temporary files are no longer used. This reduces the chance of external
+#   people reading your email. The script may use slightly more memory,
+#   depending on the size of the largest email. (Email is now buffered as it
+#   is read, and the whole buffer is printed when a match occurs. This is in
+#   contrast to storing the file pointer and seeking back to the start of the
+#   email.) The script is substantially faster for large amounts of data piped
+#   as STDIN. Many thanks go to Joey Hess (<joey@kitenet.net>), who supplied
+#   insights and contributions toward making this release happen, especially
+#   the buffering code.
 # 3.5 Temporary files are now placed in the current directory to improve
 #   privacy and avoid attacks. Fixed a bug that would occasionally leave a
 #   tempfile around. Now the script will not try to decompress piped input
@@ -143,11 +152,6 @@ sub cleanExit
     $message = "Cancelled";
   }
 
-  if (defined $main::tempFile)
-  {
-    unlink $main::tempFile;
-  }
-
   print "$message.\n";
 
   exit;
@@ -155,19 +159,16 @@ sub cleanExit
 
 #-------------------------------------------------------------------------------
 
-# This will be cleaned up by cleanExit if it is used later.
-my $tempFile = undef;
-
-#-------------------------------------------------------------------------------
-
-my (%opts, $pattern, $unzipMethod);
+my (%opts, $pattern, $unzipMethod, $commandLine);
 
 BEGIN
 {
+  $commandLine = "$0 @ARGV";
+
   if (DEBUG)
   {
     print "DEBUG: Command line was:\n";
-    print "DEBUG:   $0 @ARGV\n";
+    print "DEBUG:   $commandLine\n";
   }
 
   # Print usage error if no arguments given
@@ -267,16 +268,6 @@ $SIG{INT} = \&cleanExit;
 $SIG{QUIT} = \&cleanExit;
 $SIG{TERM} = \&cleanExit;
 
-my $tempDir;
-if (defined $ENV{TMPDIR})
-{
-  $tempDir = $ENV{TMPDIR};
-}
-else
-{
-  $tempDir = $ENV{HOME};
-}
-
 # If the user provided input files...
 if (@ARGV)
 {
@@ -296,7 +287,6 @@ if (@ARGV)
     warn "** Skipping directory: '$file' **\n" and next if -d $file;
 
     my $fileHandle = new FileHandle;
-    $main::tempFile = "$tempDir/grepmail.$$";
 
     # If it's not a compressed file
     if ($file !~ /\.(gz|Z|bz2|tz)$/)
@@ -309,42 +299,26 @@ if (@ARGV)
     elsif ($file =~ /\.tz$/)
     {
       print "DEBUG: Calling tzip to decompress file.\n" if DEBUG;
-      system("tzip -cd $file > $main::tempFile") == 0
+      $fileHandle->open("tzip -cd $file|") 
         or cleanExit "Can't execute tzip for file $file";
-      # Make sure our email stays private!
-      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
-
-      $fileHandle->open($main::tempFile)
-        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
       print "DEBUG: Calling gunzip to decompress file.\n" if DEBUG;
-      system("gunzip -c $file > $main::tempFile") == 0
+      $fileHandle->open("gunzip -c $file|")
         or cleanExit "Can't execute gunzip for file $file";
-      # Make sure our email stays private!
-      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
-
-      $fileHandle->open($main::tempFile)
-        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
       print "DEBUG: Calling bzip2 to decompress file.\n" if DEBUG;
-      system("bzip2 -dc $file > $main::tempFile") == 0
+      $fileHandle->open("bzip2 -dc $file|")
         or cleanExit "Can't execute bzip2 for file $file";
-      # Make sure our email stays private!
-      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
-
-      $fileHandle->open($main::tempFile)
-        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
 
     ProcessMailFile($fileHandle,$file);
     $fileHandle->close();
-    unlink $main::tempFile;
   }
 }
 # Using STDIN
@@ -352,90 +326,76 @@ else
 { 
   print "DEBUG: Handling STDIN\n" if DEBUG;
 
-  my $fileHandle = new FileHandle;
-  $fileHandle->open("<&STDIN") || cleanExit "Can't dup STDIN $!";
+  # We have to implement our own -B and -s, because STDIN gets eaten by them
+  binmode STDIN;
 
-  # If it looks binary and is non-empty, try to uncompress it.
-  if ((-B $fileHandle) && (-s $fileHandle))
+  my ($testChars,$isEmpty,$isBinary);
+
+  $isEmpty = 1 if !read(STDIN,$testChars,100);
+
+  # This isn't the "real" way to do -B, but it should work okay.
+  $isBinary = 1 if $testChars =~ /\000/ || $testChars =~ /[\200-\377]/;
+
+  # If it looks binary and is non-empty, try to uncompress it. Here we're
+  # calling another copy of grepmail through the open command.
+  if (($isBinary) && (!$isEmpty))
   {
-    binmode $fileHandle;
-    $main::tempFile = "$tempDir/grepmail.$$";
+    my $filter;
 
-    my $testChars;
-    read $fileHandle,$testChars,2;
-
-    # Make it so we don't die if the pipe fails
-    $SIG{PIPE} = 'IGNORE';
-    
     # This seems to work. I'm not sure what the "proper" way to distinguish
     # between gzip'd and bzip2'd and tzip'd files is.
-    if ($testChars eq "TZ")
+    if ($testChars =~ /^TZ/)
     {
       print "DEBUG: Trying to decompress using tzip.\n" if DEBUG;
-      open(TMP,"|tzip -cd >$main::tempFile")
-        || cleanExit "Can't create $main::tempFile $!";
+      $filter = "tzip -dc";
     }
-    elsif ($testChars eq "BZ")
+    elsif ($testChars =~ /^BZ/)
     {
       print "DEBUG: Trying to decompress using bzip2.\n" if DEBUG;
-      open(TMP,"|bzip2 -d >$main::tempFile")
-        || cleanExit "Can't create $main::tempFile $!";
+      $filter = "bzip2 -d";
     }
     else
     {
       print "DEBUG: Trying to decompress using gunzip.\n" if DEBUG;
-      open(TMP,"|gunzip -c >$main::tempFile")
-        || cleanExit "Can't create $main::tempFile $!";
+      $filter = "gunzip -c";
     }
 
-    binmode TMP;
-    print TMP $testChars;
-    print TMP while <$fileHandle>;
-    close TMP;
-    # Make sure our email stays private!
-    chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
-
-    $fileHandle->close() || cleanExit "Error writing $main::tempFile $!";
-
-    cleanExit "** Couldn't uncompress standard input **" if -z $main::tempFile;
-
-    $fileHandle->open($main::tempFile)
-      || cleanExit "Can't open $main::tempFile $!";
-    ProcessMailFile($fileHandle,"Gzip'd standard input");
-    $fileHandle->close();
-    unlink $main::tempFile;      
+    # Here we invoke another copy of grepmail with a filter in front. We
+    # send it the test characters, then whatever is left on stdin.
+    my $fileHandle = new FileHandle;
+    $fileHandle->open("|$filter|$commandLine")
+      or cleanExit "Can't execute '$filter' on stdin";
+    print $fileHandle $testChars;
+    print $fileHandle <STDIN>;
+    close $fileHandle;
   }
-  # Otherwise save it directly
+  # Otherwise process it directly
   else
   {
-    print "DEBUG: Saving text from STDIN to a temporary file.\n" if DEBUG;
-
-    $main::tempFile = "$tempDir/grepmail.$$";
-    open(TMP,">$main::tempFile")
-      || cleanExit "Can't create $main::tempFile $!";
-    print TMP while <$fileHandle>;
-    close TMP;
-    # Make sure our email stays private!
-    chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
-
-    $fileHandle->close() || cleanExit "Error writing $main::tempFile $!";
-
-    $fileHandle->open($main::tempFile)
-      || cleanExit "Can't open $main::tempFile $!";
-    ProcessMailFile($fileHandle,"Standard input");
-    $fileHandle->close();
-    unlink $main::tempFile;
+    # It's really bad to pass the test characters with the input stream,
+    # but I don't know of another way to do what I want.
+    # (Well, okay, I could create a class that encapsulates STDIN and uses a
+    # buffer to allow you to read without removing data from the stream. When
+    # the buffer is empty, it reads from the real STDIN.)
+    ProcessMailFile(*STDIN,"Standard input",$testChars);
   }
 }
 
 #-------------------------------------------------------------------------------
 
+# $firstChars is used because the caller might have read some stuff off of
+# STDIN, and couldn't put it back for use here.
 sub ProcessMailFile ($$)
 {
 my $fileHandle = shift @_;
 my $fileName = shift @_;
-my ($numberOfMatches,$start,$matchesBody,$matchesHeader,$paragraph);
+my $firstChars = shift @_;
 
+my ($numberOfMatches,$matchesBody,$matchesHeader,$paragraph,$email_buffer,
+    $header_buffer);
+
+$email_buffer = '';
+$header_buffer = undef;
 $numberOfMatches = 0;
 
 # Read whole paragraphs
@@ -444,9 +404,31 @@ $/ = "\n\n";
 # This is the main loop. It's executed once for each email
 while (!eof($fileHandle))
 {
-  # Read the header
-  $start = tell $fileHandle;
-  $paragraph = <$fileHandle>;
+  $email_buffer='';
+  
+  # Read the header for the first email
+  if (!defined $header_buffer)
+  {
+    print "DEBUG: Getting header for first email.\n" if DEBUG;
+    if (defined $firstChars)
+    {
+      $paragraph = $firstChars;
+      undef $firstChars;
+      $paragraph .= <$fileHandle>;
+    }
+    else
+    {
+      $paragraph = <$fileHandle>;
+    }
+  }
+  else
+  {
+    print "DEBUG: Processing buffered header.\n" if DEBUG;
+    $paragraph = $header_buffer;
+    undef $header_buffer;
+  }
+
+  $email_buffer .= $paragraph;
 
   if (DEBUG)
   {
@@ -479,7 +461,7 @@ while (!eof($fileHandle))
     if (!&CheckDate(\$header))
     {
       print "DEBUG: Header failed date constraint.\n" if (DEBUG);
-      SkipToNextEmail($fileHandle);
+      SkipToNextEmail($fileHandle,\$header_buffer);
       next;
     }
 
@@ -495,11 +477,11 @@ while (!eof($fileHandle))
     elsif ($opts{r})
     {
       $numberOfMatches++;
-      SkipToNextEmail($fileHandle);
+      SkipToNextEmail($fileHandle,\$header_buffer);
     }
     else
     {
-      PrintEmail($fileHandle,$fileName,$start);
+      PrintEmail($fileHandle,$fileName,$email_buffer,\$header_buffer);
     }
 
     next;
@@ -515,7 +497,7 @@ while (!eof($fileHandle))
   {
     print "DEBUG: Doing an early abort based on header.\n" if (DEBUG);
 
-    SkipToNextEmail($fileHandle);
+    SkipToNextEmail($fileHandle,\$header_buffer);
     next;
   }
 
@@ -525,6 +507,7 @@ while (!eof($fileHandle))
   do
   {
     $paragraph = <$fileHandle>;
+    $email_buffer .= $paragraph;
   }
   while (!eof && ($paragraph !~ /^\n?From .*\d{4}/) &&
         ($paragraph !~ /$pattern/om));
@@ -536,8 +519,8 @@ while (!eof($fileHandle))
   }
   elsif ($paragraph =~ /^\n?From .*\d{4}/)
   {
-    print "DEBUG: Found next email message.\n" if (DEBUG);
-    seek ($fileHandle, -(length $paragraph), 1);
+    print "DEBUG: Found next email's header, buffering.\n" if (DEBUG);
+    $header_buffer = $paragraph;
     $matchesBody = 0;
   }
   else
@@ -564,7 +547,7 @@ while (!eof($fileHandle))
     {
       print "DEBUG: Failed date constraint.\n" if (DEBUG);
 
-      SkipToNextEmail($fileHandle);
+      SkipToNextEmail($fileHandle,\$header_buffer);
       next;
     }
 
@@ -578,11 +561,11 @@ while (!eof($fileHandle))
     elsif ($opts{r})
     {
       $numberOfMatches++;
-      SkipToNextEmail($fileHandle);
+      SkipToNextEmail($fileHandle,\$header_buffer);
     }
     else
     {
-      PrintEmail($fileHandle,$fileName,$start);
+      PrintEmail($fileHandle,$fileName,$email_buffer,\$header_buffer);
     }
   }
   else
@@ -590,9 +573,8 @@ while (!eof($fileHandle))
     print "DEBUG: Did not find a pattern match on the body.\n" if (DEBUG);
 
     # It doesn't match the pattern
-    SkipToNextEmail($fileHandle);
+    SkipToNextEmail($fileHandle,\$header_buffer);
   }
-
 }
 
  print "$fileName: $numberOfMatches\n" if ($opts{r});
@@ -600,12 +582,17 @@ while (!eof($fileHandle))
 
 #-------------------------------------------------------------------------------
 
-sub SkipToNextEmail($)
+sub SkipToNextEmail($\$)
 {
   my $fileHandle = shift;
+  my $header_buffer = shift;
   my $paragraph;
 
   print "DEBUG: Skipping to next email.\n" if (DEBUG);
+
+  # If we have something buffered, it's the beginning of the next email
+  # address, so we don't need to do anything. Joy.
+  return if defined $$header_buffer;
 
   do
   {
@@ -613,23 +600,43 @@ sub SkipToNextEmail($)
   }
   while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
 
-  # Back up if we went too far
-  seek ($fileHandle, -(length $paragraph), 1) if (!eof);
+  # Buffer if we went too far.
+  $$header_buffer = $paragraph if (!eof);
 }
 
 #-------------------------------------------------------------------------------
 
-sub PrintEmail($$$)
+sub PrintEmail($$$\$)
 {
   my $fileHandle = shift;
   my $fileName = shift;
-  my $start = shift;
-  my $paragraph;
+  my $email_buffer = shift;
+  my $header_buffer = shift;
+  
+  # Read in and process parts of message we already have.
+  my ($paragraph, @paragraphs);
+  foreach $paragraph (split(/\n\n/,$email_buffer))
+  {
+    push @paragraphs, "$paragraph\n\n";
+  }
+  undef $paragraph;
+  
+  # Read in remainder of message, if necessary.
+  if ((!defined $$header_buffer) && (!eof))
+  {
+    do
+    {
+      $paragraph = <$fileHandle>;
+      push @paragraphs, $paragraph;
+    }
+    while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
+
+    # Buffer if we read too far.
+    $$header_buffer = $paragraph if (!eof);
+  }
 
   print "DEBUG: Printing email.\n" if (DEBUG);
-
-  seek ($fileHandle, $start, 0);
-  $paragraph = <$fileHandle>;
+  $paragraph = shift @paragraphs;
 
   # Strip any newline at the start of the header. Because the pattern is
   # "\n\n", there will sometimes be an extra newline if there are an odd
@@ -646,7 +653,7 @@ sub PrintEmail($$$)
 
   do
   {
-    $paragraph = <$fileHandle>;
+    $paragraph = shift @paragraphs;
 
     print $paragraph if $paragraph !~ /^\n?From .*\d{4}/;
 
@@ -659,10 +666,7 @@ sub PrintEmail($$$)
       print "\n";
     }
   }
-  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
-
-  # Back up if we went too far. 
-  seek ($fileHandle, -(length $paragraph), 1) if (!eof);
+  while (@paragraphs && ($paragraph !~ /^\n?From .*\d{4}/)) ;
 }
 
 #-------------------------------------------------------------------------------
@@ -963,17 +967,16 @@ mailboxes:
 
 =head1 FILES
 
-grepmail will create temporary files while decompressing compressed archives.
-These temporary files are placed in the directory specified by the TMPDIR
-environment variable, or in the user's home directory if no directory is
-specified. (They are not placed in /tmp because of privacy concerns.) Any
-files created have their permissions set such that only the user has
-read-write access.
+grepmail will I<not> create temporary files while decompressing compressed
+archives. The last version to do this was 3.5. While the new design uses
+more memory, the code is much simpler, and there is less chance that email
+can be read by malicious third parties. Memory usage is determined by the size
+of the largest email message in the mailbox.
 
 =head1 AUTHOR
 
   David Coppit, <coppit@cs.virginia.edu>,
-  http://www.cs.virginia.edu/~dwc3q/index.thml
+  http://www.cs.virginia.edu/~dwc3q/index.html
 
 =head1 SEE ALSO
 
