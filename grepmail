@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/cs/bin/perl -w
 
 # use perl                                  -*- mode: Perl; -*-
 eval 'exec perl -S $0 "$@"'
@@ -10,14 +10,15 @@ use constant DEBUG => 0;
 
 require 5.00396;
 
-# grepmail version 3.4
+# grepmail version 3.5
 
 # Grepmail searches a normal, gzip'd, or bzip2'd mailbox for a given regular
 # expression and returns those emails that match the query. It also supports
 # piped compressed or ascii input, and searches constrained by date. 
 
 # If you would like to be notified of updates, send email to me at
-# coppit@cs.virginia.edu
+# coppit@cs.virginia.edu. The latest version is always at
+# http://www.cs.virginia.edu/~dwc3q/code/.
 
 # Do a pod2text on this file to get full documentation, or pod2man to get
 # man pages.
@@ -34,6 +35,13 @@ require 5.00396;
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+
+# 3.5 Temporary files are now placed in the current directory to improve
+#   privacy and avoid attacks. Fixed a bug that would occasionally leave a
+#   tempfile around. Now the script will not try to decompress piped input
+#   that is empty.
+# 3.4.1 Fixed a small bug that inserted a newline at the start of output.
+#   (Thanks to Moritz Barsnick <barsnick@gmx.net> for helping to find this.)
 # 3.4 Added tzip support (thanks to Marc Lehmann <pcg@goof.com>). Changed
 #   command line syntax again. (Last time, I hope.)
 # 3.3 Added bzip2 support (thanks to Josh Plautz <plautz@milner.com>).
@@ -135,20 +143,20 @@ sub cleanExit
     $message = "Cancelled";
   }
 
-  if (defined $MAIN::mbox)
+  if (defined $main::tempFile)
   {
-    unlink $MAIN::mbox;
-  }
-
-  if (defined $MAIN::tempFile)
-  {
-    unlink $MAIN::tempFile;
+    unlink $main::tempFile;
   }
 
   print "$message.\n";
 
   exit;
 }
+
+#-------------------------------------------------------------------------------
+
+# This will be cleaned up by cleanExit if it is used later.
+my $tempFile = undef;
 
 #-------------------------------------------------------------------------------
 
@@ -162,19 +170,18 @@ BEGIN
     print "DEBUG:   $0 @ARGV\n";
   }
 
-  $pattern = "";
-
   # Print usage error if no arguments given
-  print "No arguments given. grepmail -h for help.\n" and exit if ($#ARGV < 0);
+  print "No arguments given. grepmail -h for help.\n" and exit if (!@ARGV);
 
   getopt("ed",\%opts);
 
-  # At this point, we have 3 cases:
+  # At this point, we have 4 cases:
   # - The -d was specified without a pattern before it, in which case $opts{d}
   #   will be set. An implicit "." is used unless -e was specified.
   # - The pattern is in $ARGV[0], and -d is in $ARGV[1]
   # - There is no -d in $ARGV[1], and a pattern or file is in $ARGV[0]. Take
   #   is as a pattern if -e was not given.
+  # - They did something like "grepmail -h", in which case do nothing
   if ($opts{d})
   {
     $pattern = "." if !$opts{e};
@@ -184,7 +191,7 @@ BEGIN
     $pattern = shift @ARGV;
     getopt("d",\%opts);
   }
-  elsif (!$opts{e})
+  elsif (!$opts{e} && @ARGV)
   {
     $pattern = shift @ARGV;
   }
@@ -206,11 +213,11 @@ BEGIN
 
   if ($opts{e})
   {
-    print "You specified two search patterns.\n" and exit if ($pattern ne "");
+    print "You specified two search patterns.\n" and exit if (defined $pattern);
     
     $pattern = $opts{e};
   }
-  elsif ($pattern eq "")
+  elsif (!defined $pattern)
   {
     # The only time you can't specify the pattern is when -d is being used.
     # This should catch people who do "grepmail -h" thinking it's help.
@@ -253,8 +260,10 @@ if (DEBUG)
   print "DEBUG: FILES: @ARGV\n";
 }
 
-$SIG{HUP} =  \&cleanExit;
-$SIG{INT} =  \&cleanExit;
+# Catch everything I can...
+$SIG{PIPE} = \&cleanExit;
+$SIG{HUP} = \&cleanExit;
+$SIG{INT} = \&cleanExit;
 $SIG{QUIT} = \&cleanExit;
 $SIG{TERM} = \&cleanExit;
 
@@ -265,7 +274,7 @@ if (defined $ENV{TMPDIR})
 }
 else
 {
-  $tempDir = "/tmp";
+  $tempDir = $ENV{HOME};
 }
 
 # If the user provided input files...
@@ -287,7 +296,7 @@ if (@ARGV)
     warn "** Skipping directory: '$file' **\n" and next if -d $file;
 
     my $fileHandle = new FileHandle;
-    my $tempFile = "$tempDir/grepmail.$$";
+    $main::tempFile = "$tempDir/grepmail.$$";
 
     # If it's not a compressed file
     if ($file !~ /\.(gz|Z|bz2|tz)$/)
@@ -300,42 +309,42 @@ if (@ARGV)
     elsif ($file =~ /\.tz$/)
     {
       print "DEBUG: Calling tzip to decompress file.\n" if DEBUG;
-      system("tzip -cd $file > $tempFile") == 0
+      system("tzip -cd $file > $main::tempFile") == 0
         or cleanExit "Can't execute tzip for file $file";
       # Make sure our email stays private!
-      chmod 0600, $tempFile;
+      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
 
-      $fileHandle->open($tempFile)
+      $fileHandle->open($main::tempFile)
         || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
       print "DEBUG: Calling gunzip to decompress file.\n" if DEBUG;
-      system("gunzip -c $file > $tempFile") == 0
+      system("gunzip -c $file > $main::tempFile") == 0
         or cleanExit "Can't execute gunzip for file $file";
       # Make sure our email stays private!
-      chmod 0600, $tempFile;
+      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
 
-      $fileHandle->open($tempFile)
+      $fileHandle->open($main::tempFile)
         || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
       print "DEBUG: Calling bzip2 to decompress file.\n" if DEBUG;
-      system("bzip2 -dc $file > $tempFile") == 0
+      system("bzip2 -dc $file > $main::tempFile") == 0
         or cleanExit "Can't execute bzip2 for file $file";
       # Make sure our email stays private!
-      chmod 0600, $tempFile;
+      chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
 
-      $fileHandle->open($tempFile)
+      $fileHandle->open($main::tempFile)
         || cleanExit "Can't open temporary file used to decompress the file $file";
     }
 
     ProcessMailFile($fileHandle,$file);
     $fileHandle->close();
-    unlink $tempFile;
+    unlink $main::tempFile;
   }
 }
 # Using STDIN
@@ -346,11 +355,11 @@ else
   my $fileHandle = new FileHandle;
   $fileHandle->open("<&STDIN") || cleanExit "Can't dup STDIN $!";
 
-  # If it looks binary, try to uncompress it.
-  if (-B $fileHandle)
+  # If it looks binary and is non-empty, try to uncompress it.
+  if ((-B $fileHandle) && (-s $fileHandle))
   {
     binmode $fileHandle;
-    my $tempFile = "$tempDir/grepmail.$$";
+    $main::tempFile = "$tempDir/grepmail.$$";
 
     my $testChars;
     read $fileHandle,$testChars,2;
@@ -363,17 +372,20 @@ else
     if ($testChars eq "TZ")
     {
       print "DEBUG: Trying to decompress using tzip.\n" if DEBUG;
-      open(TMP,"|tzip -cd >$tempFile") || cleanExit "Can't create $tempFile $!";
+      open(TMP,"|tzip -cd >$main::tempFile")
+        || cleanExit "Can't create $main::tempFile $!";
     }
     elsif ($testChars eq "BZ")
     {
       print "DEBUG: Trying to decompress using bzip2.\n" if DEBUG;
-      open(TMP,"|bzip2 -d >$tempFile") || cleanExit "Can't create $tempFile $!";
+      open(TMP,"|bzip2 -d >$main::tempFile")
+        || cleanExit "Can't create $main::tempFile $!";
     }
     else
     {
       print "DEBUG: Trying to decompress using gunzip.\n" if DEBUG;
-      open(TMP,"|gunzip -c >$tempFile") || cleanExit "Can't create $tempFile $!";
+      open(TMP,"|gunzip -c >$main::tempFile")
+        || cleanExit "Can't create $main::tempFile $!";
     }
 
     binmode TMP;
@@ -381,35 +393,38 @@ else
     print TMP while <$fileHandle>;
     close TMP;
     # Make sure our email stays private!
-    chmod 0600, $tempFile;
+    chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
 
-    $fileHandle->close() || cleanExit "Error writing $tempFile $!";
+    $fileHandle->close() || cleanExit "Error writing $main::tempFile $!";
 
-    cleanExit "** Couldn't uncompress standard input **" if -z $tempFile;
+    cleanExit "** Couldn't uncompress standard input **" if -z $main::tempFile;
 
-    $fileHandle->open($tempFile) || cleanExit "Can't open $tempFile $!";
+    $fileHandle->open($main::tempFile)
+      || cleanExit "Can't open $main::tempFile $!";
     ProcessMailFile($fileHandle,"Gzip'd standard input");
     $fileHandle->close();
-    unlink $tempFile;      
+    unlink $main::tempFile;      
   }
   # Otherwise save it directly
   else
   {
     print "DEBUG: Saving text from STDIN to a temporary file.\n" if DEBUG;
 
-    my $tempFile = "/tmp/grepmail.$$";
-    open(TMP,">$tempFile") || cleanExit "Can't create $tempFile $!";
+    $main::tempFile = "$tempDir/grepmail.$$";
+    open(TMP,">$main::tempFile")
+      || cleanExit "Can't create $main::tempFile $!";
     print TMP while <$fileHandle>;
     close TMP;
     # Make sure our email stays private!
-    chmod 0600, $tempFile;
+    chmod 0600, $main::tempFile || cleanExit "Error doing chmod $!";
 
-    $fileHandle->close() || cleanExit "Error writing $tempFile $!";
+    $fileHandle->close() || cleanExit "Error writing $main::tempFile $!";
 
-    $fileHandle->open($tempFile) || cleanExit "Can't open $tempFile $!";
+    $fileHandle->open($main::tempFile)
+      || cleanExit "Can't open $main::tempFile $!";
     ProcessMailFile($fileHandle,"Standard input");
     $fileHandle->close();
-    unlink $tempFile;
+    unlink $main::tempFile;
   }
 }
 
@@ -438,11 +453,9 @@ while (!eof($fileHandle))
     print "DEBUG: ------------------------------------------------------\n";
     print "DEBUG: Processing email:\n";
     $paragraph =~ /^from:.*$/im;
-    my $info = $&;
-    print "DEBUG:   $info\n";
+    print "DEBUG:   $&\n";
     $paragraph =~ /^subject:.*$/im;
-    $info = $&;
-    print "DEBUG:   $info\n";
+    print "DEBUG:   $&\n";
   }
 
   # Save the header for later when we check the date.
@@ -460,10 +473,12 @@ while (!eof($fileHandle))
       (!$opts{h} && !$opts{b} && !$opts{v} && $matchesHeader)
      )
   {
+    print "DEBUG: Checking for early printout based on header.\n" if (DEBUG);
+
     # Skip to the next email if the date is wrong.
     if (!&CheckDate(\$header))
     {
-      print "DEBUG: Failed date constraint.\n" if (DEBUG);
+      print "DEBUG: Header failed date constraint.\n" if (DEBUG);
       SkipToNextEmail($fileHandle);
       next;
     }
@@ -511,7 +526,7 @@ while (!eof($fileHandle))
   {
     $paragraph = <$fileHandle>;
   }
-  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/) &&
+  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/) &&
         ($paragraph !~ /$pattern/om));
 
   if (eof)
@@ -519,7 +534,7 @@ while (!eof($fileHandle))
     print "DEBUG: Found EOF.\n" if (DEBUG);
     $matchesBody = 0;
   }
-  elsif ($paragraph =~ /^\n*From .*\d{4}/)
+  elsif ($paragraph =~ /^\n?From .*\d{4}/)
   {
     print "DEBUG: Found next email message.\n" if (DEBUG);
     seek ($fileHandle, -(length $paragraph), 1);
@@ -596,7 +611,7 @@ sub SkipToNextEmail($)
   {
     $paragraph = <$fileHandle>;
   }
-  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
+  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
 
   # Back up if we went too far
   seek ($fileHandle, -(length $paragraph), 1) if (!eof);
@@ -616,6 +631,11 @@ sub PrintEmail($$$)
   seek ($fileHandle, $start, 0);
   $paragraph = <$fileHandle>;
 
+  # Strip any newline at the start of the header. Because the pattern is
+  # "\n\n", there will sometimes be an extra newline if there are an odd
+  # number of newlines between emails.
+  $paragraph =~ s/^\n(From .*\d{4})/$1/;
+
   # Print the mailfolder in the headers if -m was given
   if ($opts{"m"})
   {
@@ -627,11 +647,21 @@ sub PrintEmail($$$)
   do
   {
     $paragraph = <$fileHandle>;
-    print $paragraph if ($paragraph !~ /^\n*From .*\d{4}/);
-  }
-  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
 
-  # Back up if we went too far
+    print $paragraph if $paragraph !~ /^\n?From .*\d{4}/;
+
+    # Print the extra newline that appears when there are an odd number of
+    # newlines bewteen messages. Basically I consider the newline to be part
+    # of the previous message, although I don't think it matters.
+    if ($paragraph =~ /^\nFrom .*\d{4}/)
+    {
+      $paragraph =~ s/^\n//;
+      print "\n";
+    }
+  }
+  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
+
+  # Back up if we went too far. 
   seek ($fileHandle, -(length $paragraph), 1) if (!eof);
 }
 
@@ -930,6 +960,15 @@ Print a count of the number of messages about grepmail in all saved-mail
 mailboxes:
 
   grepmail -br grepmail saved-mail*
+
+=head1 FILES
+
+grepmail will create temporary files while decompressing compressed archives.
+These temporary files are placed in the directory specified by the TMPDIR
+environment variable, or in the user's home directory if no directory is
+specified. (They are not placed in /tmp because of privacy concerns.) Any
+files created have their permissions set such that only the user has
+read-write access.
 
 =head1 AUTHOR
 
