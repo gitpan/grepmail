@@ -2,8 +2,8 @@
 
 use strict;
 
-use Test;
-use lib 'lib';
+use Test::More;
+use lib 't';
 use Test::Utils;
 use File::Spec::Functions qw( :ALL );
 
@@ -27,7 +27,7 @@ my %expected_errors = (
 
 mkdir 't/temp', 0700;
 
-plan (tests => scalar (keys %tests));
+plan tests => scalar (keys %tests) * 2;
 
 my %skip = SetSkip(\%tests);
 
@@ -35,9 +35,12 @@ foreach my $test (sort keys %tests)
 {
   print "Running test:\n  $test\n";
 
-  skip("Skip $skip{$test}",1), next if exists $skip{$test};
+  SKIP:
+  {
+    skip("$skip{$test}",2) if exists $skip{$test};
 
-  TestIt($test, $tests{$test}, $expected_errors{$test});
+    TestIt($test, $tests{$test}, $expected_errors{$test});
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -78,16 +81,14 @@ sub TestIt
 
   if (!$? && defined $error_expected)
   {
-    print "Did not encounter an error executing the test when one was expected.\n\n";
-    ok(0);
+    ok(0,"Did not encounter an error executing the test when one was expected.\n\n");
     return;
   }
 
   if ($? && !defined $error_expected)
   {
-    print "Encountered an error executing the test when one was not expected.\n";
-    print "See $test_stdout and $test_stderr.\n\n";
-    ok(0);
+    ok(0, "Encountered an error executing the test when one was not expected.\n" .
+      "See $test_stdout and $test_stderr.\n\n");
     return;
   }
 
@@ -95,7 +96,8 @@ sub TestIt
   my $real_stdout = catfile('t','results',$stdout_file);
   my $real_stderr = catfile('t','results',$stderr_file);
 
-  CheckDiffs([$real_stdout,$test_stdout],[$real_stderr,$test_stderr]);
+  Do_Diff($real_stdout,$test_stdout);
+  Do_Diff($real_stderr,$test_stderr);
 }
 
 # ---------------------------------------------------------------------------
@@ -106,7 +108,7 @@ sub SetSkip
 
   my %skip;
 
-  unless (defined $Mail::Mbox::MessageParser::PROGRAMS{'gzip'})
+  unless (defined $Mail::Mbox::MessageParser::Config{'programs'}{'gzip'})
   {
     $skip{'grepmail -v Handy t/mailboxes/mailarc-1.txt.gz'}
       = 'gzip support not enabled in Mail::Mbox::MessageParser';
@@ -114,7 +116,7 @@ sub SetSkip
       = 'gzip support not enabled in Mail::Mbox::MessageParser';
   }
 
-  unless (defined $Mail::Mbox::MessageParser::PROGRAMS{'bzip2'})
+  unless (defined $Mail::Mbox::MessageParser::Config{'programs'}{'bzip2'})
   {
     $skip{'grepmail -v Handy t/mailboxes/mailarc-1.txt.bz2'}
       = 'bzip2 support not enabled in Mail::Mbox::MessageParser';
@@ -122,7 +124,7 @@ sub SetSkip
       = 'bzip2 support not enabled in Mail::Mbox::MessageParser';
   }
 
-  unless (defined $Mail::Mbox::MessageParser::PROGRAMS{'tzip'})
+  unless (defined $Mail::Mbox::MessageParser::Config{'programs'}{'tzip'})
   {
     $skip{'grepmail -v Handy t/mailboxes/mailarc-1.txt.tz'}
       = 'tzip support not enabled in Mail::Mbox::MessageParser';

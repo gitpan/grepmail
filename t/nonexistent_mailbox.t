@@ -2,8 +2,8 @@
 
 use strict;
 
-use Test;
-use lib 'lib';
+use Test::More;
+use lib 't';
 use Test::Utils;
 use File::Spec::Functions qw( :ALL );
 use File::Copy;
@@ -43,7 +43,7 @@ my %localization = (
 
 mkdir 't/temp', 0700;
 
-plan (tests => scalar (keys %tests));
+plan tests => scalar (keys %tests) * 2;
 
 my %skip = SetSkip(\%tests);
 
@@ -51,9 +51,12 @@ foreach my $test (sort keys %tests)
 {
   print "Running test:\n  $test\n";
 
-  skip("Skip $skip{$test}",1), next if exists $skip{$test};
+  SKIP:
+  {
+    skip("$skip{$test}",2) if exists $skip{$test};
 
-  TestIt($test, $tests{$test}, $expected_errors{$test}, $localization{$test});
+    TestIt($test, $tests{$test}, $expected_errors{$test}, $localization{$test});
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -96,16 +99,14 @@ sub TestIt
 
   if (!$? && defined $error_expected)
   {
-    print "Did not encounter an error executing the test when one was expected.\n\n";
-    ok(0);
+    ok(0,"Did not encounter an error executing the test when one was expected.\n\n");
     return;
   }
 
   if ($? && !defined $error_expected)
   {
-    print "Encountered an error executing the test when one was not expected.\n";
-    print "See $test_stdout and $test_stderr.\n\n";
-    ok(0);
+    ok(0, "Encountered an error executing the test when one was not expected.\n" .
+      "See $test_stdout and $test_stderr.\n\n");
     return;
   }
 
@@ -133,7 +134,8 @@ sub TestIt
     copy($real_stderr, $modified_stderr);
   }
 
-  CheckDiffs([$modified_stdout,$test_stdout],[$modified_stderr,$test_stderr]);
+  Do_Diff($modified_stdout,$test_stdout);
+  Do_Diff($modified_stderr,$test_stderr);
 
   unlink $modified_stdout;
   unlink $modified_stderr;

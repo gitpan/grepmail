@@ -3,13 +3,14 @@ package Module::Install::CustomInstallationPath;
 
 use strict;
 use File::HomeDir;
+use Config;
 
 use vars qw( @ISA $VERSION );
 
 use Module::Install::Base;
 @ISA = qw( Module::Install::Base );
 
-$VERSION = '0.10.2';
+$VERSION = '0.10.3';
 
 # ---------------------------------------------------------------------------
 
@@ -24,10 +25,10 @@ sub Check_Custom_Installation
   return if (grep {/^PREFIX=/} @ARGV) || (grep {/^INSTALLDIRS=/} @ARGV);
 
   my $install_location = $self->prompt(
-    "Choose your installation type:\n[1] normal Perl locations\n" .
-    "[2] custom locations\n=>" => '1');
+    "Would you like to install this package into a location other than the\n" .
+    "default Perl location (i.e. change the PREFIX)?" => 'n');
 
-  if ($install_location eq '2')
+  if ($install_location eq 'y')
   {
     my $home = home();
 
@@ -47,5 +48,5 @@ sub Check_Custom_Installation
 
 # ---------------------------------------------------------------------------
 
-#line 98
+#line 106
 
