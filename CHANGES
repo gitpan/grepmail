@@ -1,3 +1,27 @@
+New in version 4.51:
+- grepmail now dies gracefully when invalid patterns like 'strcpy(' are
+  supplied. (It should be 'strcpy\('.)
+- Fixed a bug in attachment boundary matching which would cause the boundary
+  match to fail if the boundary contained special pattern matching characters.
+  (Thanks to Richard Everson <rme at users.sourceforge.net> for identifying
+  the bug, and providing a sample email which demonstrates the problem.)
+- Added a check for Inline 0.41 or better during "perl Makefile.PL" when
+  Mail::Folder::FastReader is selected to be installed. (Thanks to Brian L.
+  Johnson <blj8@blj8.com> for the problem report.)
+- Fixed a bug where grepmail would fail to print matching emails which had
+  signatures, and added a test case for it. This bug was introduced with -B
+  support in version 4.49.  (A *huge* thanks to Moritz Barsnick
+  <barsnick@gmx.net> for reporting the bug and doing the initial analysis of
+  the cause.)
+- Modified Makefile.PL to ask whether the user wants FastReader regardless of
+  whether they specified arguments to "make Makefile.PL".
+- Modified Makefile.PL to allow the user to interactively specify the
+  installation path.
+- Fixed a typo in debugging output for emails without "Date:" headers.
+- Improved error messages.
+- Usage message now displays just the flags, --help shows a summary of their
+  meanings as well.
+
 New in version 4.50:
 - Added X-Draft-From to support newer versions of Gnus (Thanks to Nevin Kapur
   <nevin@jhu.edu> for the patch).

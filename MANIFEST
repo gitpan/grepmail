@@ -105,3 +105,5 @@ t/results/test43.stdout.real          Correct STDOUT output file
 t/results/test43.stderr.real          Correct STDERR output file
 t/results/test44.stdout.real          Correct STDOUT output file
 t/results/test44.stderr.real          Correct STDERR output file
+t/results/test45.stdout.real          Correct STDOUT output file
+t/results/test45.stderr.real          Correct STDERR output file

@@ -2,7 +2,7 @@
 
 # grepmail
 
-$VERSION = '4.50';
+$VERSION = '4.51';
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
@@ -255,11 +255,10 @@ sub cleanExit
 # PROCESS ARGUMENTS
 
 # Print usage error if no arguments given
-print "No arguments given. grepmail --help for help.\n" and exit(1)
-  if (!@ARGV);
+print usage() and exit(1) unless @ARGV;
 
 # Check for --help, the standard usage command
-print usage() and exit(0) if grep { /--help/ } @ARGV;
+print help() and exit(0) if grep { /--help/ } @ARGV;
 
 # Save the arguments because getopt changes them.
 my @args = @ARGV;
@@ -455,6 +454,8 @@ dprint "FIRST DATE: $date1\n" if $dateRestriction ne 'none';
 dprint "SECOND DATE: $date2\n" if $dateRestriction ne 'none';
 dprint "SIZE RESTRICTION: $opts{'s'}\n";
 
+ValidatePattern($pattern);
+
 # Catch everything I can... We have to localize these to prevent odd bugs from
 # cropping up (see changelog).
 local $SIG{PIPE} = \&cleanExit;
@@ -477,6 +478,19 @@ else
 }
 
 exit 0;
+
+#-------------------------------------------------------------------------------
+
+# Dies if the given pattern's syntax is invalid
+sub ValidatePattern
+{
+  my $pattern = shift;
+
+  local $@;
+
+  eval {'string' =~ /$pattern/};
+  cleanExit "The pattern \"$pattern\" is invalid.\n" if $@;
+}
 
 #-------------------------------------------------------------------------------
 
@@ -571,16 +585,16 @@ sub HandleInputFiles
       $filter = 'tzip';
 
       use vars qw(*OLDSTDERR);
-      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open OLDSTDERR,">&STDERR" or cleanExit "Can't save STDERR: $!\n";
       open STDERR,">/dev/null"
-        or die "Can't redirect STDERR to /dev/null: $!\n";
+        or cleanExit "Can't redirect STDERR to /dev/null: $!\n";
 
       unless ($fileHandle->open("tzip -cd '$file'|"))
       {
         $filterError = $!;
       }
 
-      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
+      open STDERR,">&OLDSTDERR" or cleanExit "Can't restore STDERR: $!\n";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
@@ -590,16 +604,16 @@ sub HandleInputFiles
       $filter = 'gunzip';
 
       use vars qw(*OLDSTDERR);
-      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open OLDSTDERR,">&STDERR" or cleanExit "Can't save STDERR: $!\n";
       open STDERR,">/dev/null"
-        or die "Can't redirect STDERR to /dev/null: $!\n";
+        or cleanExit "Can't redirect STDERR to /dev/null: $!\n";
 
       unless ($fileHandle->open("gzip -dc '$file'|"))
       {
         $filterError = $!;
       }
 
-      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
+      open STDERR,">&OLDSTDERR" or cleanExit "Can't restore STDERR: $!\n";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
@@ -609,16 +623,16 @@ sub HandleInputFiles
       $filter = 'bzip2';
 
       use vars qw(*OLDSTDERR);
-      open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
+      open OLDSTDERR,">&STDERR" or cleanExit "Can't save STDERR: $!\n";
       open STDERR,">/dev/null"
-        or die "Can't redirect STDERR to /dev/null: $!\n";
+        or cleanExit "Can't redirect STDERR to /dev/null: $!\n";
 
       unless ($fileHandle->open("bzip2 -dc '$file'|"))
       {
         $filterError = $!;
       }
 
-      open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
+      open STDERR,">&OLDSTDERR" or cleanExit "Can't restore STDERR: $!\n";
     }
 
     if ($filterError)
@@ -878,12 +892,13 @@ sub ProcessMailFile
 
     my $matchesBody = 0;
 
-    my ($has_signature,$signature_offset) = (0,undef);
+    my $signature_offset = undef;
 
-    if ($email_body =~ m/^-- \n/sg || $email_body =~ m/.*\n-- \n/sg)
+    if ($opts{'B'} &&
+        $email_body =~ m/^-- \n/sg || $email_body =~ m/.*\n-- \n/sg)
     {
-      $has_signature = 1;
       $signature_offset = pos($email_body) - 4;
+      pos($email_body) = 0;
     }
 
     # Ignore the MIME attachments if -M was specified
@@ -894,10 +909,12 @@ sub ProcessMailFile
       $boundary = $1 if defined $1;
       $boundary = $2 if defined $2;
 
+      dprint "Found attachments with boundary:\n  $boundary";
+
       my @attachment_positions;
 
       # Get each of the binary attachment beginnings and endings.
-      while ($email_body =~ m/\n((?:--)?$boundary(?:--)?\n(?:(.*?)\n\n)?)/sg)
+      while ($email_body =~ m/\n((?:--)?\Q$boundary\E(?:--)?\n(?:(.*?)\n\n)?)/sg)
       {
         my $position = pos($email_body) - length($1);
         my $header = $2;
@@ -915,10 +932,12 @@ sub ProcessMailFile
         }
       }
 
+      pos($email_body) = 0;
+
       # Now search the body, ignoring any matches in binary
       # attachments.
       local $^W = 0;
-      SEARCH: while ($email_body =~ m/($pattern)/og)
+      SEARCH: while ($email_body =~ m/($pattern)/omg)
       {
         my $position = pos($email_body) - length($1);
 
@@ -1552,7 +1571,7 @@ sub ProcessDate($)
   }
   else
   {
-    cleanExit "Invalid date specification. Use \"$0 -h\" for help";
+    cleanExit "\"$datestring\" is an invalid date specification. Use \"$0 -h\" for help";
   }
 
   return ($dateRestriction,$date1,$date2);
@@ -1629,9 +1648,18 @@ sub IsInDate($$$$)
 sub usage
 {
 <<EOF;
+usage: grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+EOF
+}
+
+#-------------------------------------------------------------------------------
+
+sub help
+{
+<<EOF;
 grepmail $VERSION
 
-usage: grepmail [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+usage: grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
 
 At least one of -s, -d, -u, and -e must be specified, and can appear in any
 relative order following the other flags. The -e flag is optional if expr
@@ -1662,6 +1690,7 @@ compressed ASCII input is taken from STDIN.
 -v Output emails that don't match the expression
 -V Display the version number
 -Z Not use Mail::Folder::FastReader even if it is on the system
+--help Print a help message
 
 Date specifications must be of the form of:
 a date like "today", "1st thursday in June 1992" (requires Date::Manip),
@@ -1679,7 +1708,7 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
 
 =head1 DESCRIPTION
 
@@ -1730,13 +1759,13 @@ Use arrival date instead of sent date.
 =item B<-b>
 
 Asserts that the pattern must match in the body of the email. (Not compatible
-with -B.)
+with B<-B>.)
 
 =item B<-B>
 
 Asserts that the pattern must match in the body of the email, but not the
 signature. The signature consists of everything after a line consisting of
-"-- ". (Not compatible with -b.)
+"-- ". (Not compatible with B<-b>.)
 
 =item B<-D>
 
@@ -1826,6 +1855,10 @@ without the B<-v> switch.
 
 By default, grepmail uses the Mail::Folder::FastReader module if it is on the
 system. This switch tells it to use the slower Perl implementation instead.
+
+=item B<--help>
+
+Print a help message summarizing the usage.
 
 =back
 

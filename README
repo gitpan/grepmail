@@ -4,13 +4,28 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.50:
-- Added X-Draft-From to support newer versions of Gnus 
-
-NOTE: I have received a report that Mail::Folder::FastReader may fail for
-very large mailboxes (>300MB). I have been unable to reproduce this bug so
-far, and suspect that the very large mailbox has a particular email that is
-problematic.
+New in version 4.51:
+- Fixed a bug in attachment boundary matching which would cause the boundary
+  match to fail if the boundary contained special pattern matching characters.
+  (Thanks to Richard Everson for identifying the bug, and providing a sample
+  email which demonstrates the problem.)
+- Fixed a bug where grepmail would fail to print matching emails which had
+  signatures, and added a test case for it. This bug was introduced with -B
+  support in version 4.49.  (A *huge* thanks to Moritz Barsnick for reporting
+  the bug and doing the initial analysis of the cause.)
+- grepmail now dies gracefully when invalid patterns like "strcpy(" are
+  supplied. (It should be "strcpy\(".)
+- Added a check for Inline 0.41 or better during "perl Makefile.PL" when
+  Mail::Folder::FastReader is selected to be installed. (Thanks to Brian L.
+  Johnson for the problem report.)
+- Modified Makefile.PL to ask whether the user wants FastReader regardless of
+  whether they specified arguments to "make Makefile.PL".
+- Modified Makefile.PL to allow the user to interactively specify the
+  installation path.
+- Fixed a typo in debugging output for emails without "Date:" headers.
+- Improved error messages.
+- Usage message now displays just the flags, --help shows a summary of their
+  meanings as well.
 
 
 MODULE DEPENDENCIES
@@ -83,6 +98,18 @@ HOMEPAGE
 
 Visit http://grepmail.sourceforge.net/ for the latest version, mailing lists,
 discussion forums, CVS access, and more.
+
+
+REPORTING BUGS
+
+You can report bugs at http://sourceforge.net/bugs/?group_id=2207. If the test
+suite is failing, please attach the .stdout and .stderr files for the test
+case(s), which are located in t/results. If this is a bug not in the test suite,
+please attach the output of running grepmail with the -D switch.
+
+NOTE: If you get a warning which says "Use of uninitialized value in pattern
+match (m//)", check your version of Perl (perl -v). If you're using version
+5.6.0, you will need to upgrade.
 
 
 PRIMARY AUTHOR
