@@ -8,10 +8,8 @@ use Test::Utils;
 use File::Spec::Functions qw( :ALL );
 
 my %tests = (
-"$set_env MAILDIR=t/mailboxes$command_separator grepmail Handy mailarc-1.txt"
-  => ['all_handy','none'],
-"$set_env MAILDIR=t/mailboxes$command_separator grepmail -d \"before July 15 1998\" mailarc-1.txt"
-  => ['date_1','none'],
+"grepmail -w ${single_quote}let$single_quote t/mailboxes/mailarc-1.txt"
+  => ['match_word_let','none'],
 );
 
 my %expected_errors = (
