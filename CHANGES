@@ -3,10 +3,29 @@ Features which haven't made it in yet:
   <zbrown@tumblerings.org> for the excellent feature idea and a prototype
   implementation.)
 
+New in version 5.20:
+- Added speed testing to the distribution
+- Fixed Makefile.PL so that test modules would not be installed.
+- Changed testing to use PERLRUN instead of FULLPERLRUN, which is not
+  available with older versions of MakeMaker that ship with older versions of
+  Perl. (Thanks to Ed Avis <ed.avis@kbcfp.com> for catching this.)
+- Fixed interactive installation problems. (Thanks to Joey Hess
+  <joeyh@debian.org> for catching this (again).)
+- Fixed broken searching of $HOME/mail, $HOME/Mail, and $HOME/Mailbox
+  directories when a mail folder can not be found. Changed $MAIL to $MAILDIR
+  since $MAIL usually points to the user's inbox. (Bug found and initial patch
+  by Peter Cordes <peter@llama.nslug.ns.ca>.)
+- Cache file permissions are now set to protect against prying eyes. (Patch by
+  Joey Hess <joey@kitenet.net>)
+- The user can now specify the cache file location with the -C flag.
+- Fixed compatibility problems with perl 5.005_01
+
 New in version 5.10:
 - Extracted mail parsing into the new Mail::Mbox::MessageParser module.
 - Fixed small performance loss bugs in short-circuit matching of headers which
   were introduced in the last version
+- Fixed some uses of uninitialized values (Originally reported by Ed Avis
+  <ed.avis@kbcfp.com>.)
 - Improved performance a bit.
 - The Makefile.PL now uses the default values when run non-interactively.
 - Caching is now enabled by default. (It's no longer experimental.) Users can
@@ -16,7 +35,8 @@ New in version 5.10:
   relies on Date::Manip to handle this--users must upgrade Date::Manip to get
   this support. (Thanks to Reuben Thomas <rrt@sc3d.org> for working with
   Sullivan Beck <sbeck@cise.ufl.edu> to get TodayIsMidnight added to
-  Date::Manip.)
+  Date::Manip. Original bug report by Philip Douglass
+  <philipsd@users.sourceforge.net>)
 - Restructured test cases
 
 New in version 5.00:
@@ -28,7 +48,7 @@ New in version 5.00:
 - -- now marks the end of options and the beginning of folders (Thanks to
   Reuben Thomas <rrt@sc3d.org> for the idea.)
 - -f now reads patterns from a file like GNU grep does. (Feature suggestion by
-  Darxus@chaosreigns.com)
+  Darxus@chaosreigns.com) -j is now used for status
 - Added smail compatibility. (Thanks to Roy <qroy@ghg.net> for the patch.)
 - The "**" prefix on warnings has been changed to "grepmail:"
 - Date specifications without times (e.g. "today") are interpreted as midnight

@@ -5,28 +5,18 @@ regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported, as are searches using
 logical operators.
 
-New in version 5.00:
-- grepmail is now orders of magnitude faster for mailboxes which have very
-  large (>30MB) emails in them
-- "grep" is now used to find the start of emails, if it is installed. For
-  mailboxes with large emails in them, this can speed things up by about 5x.
-- Reduced memory consumption by about 3 times.
-- -- now marks the end of options and the beginning of folders
-- -f now reads patterns from a file like GNU grep does.
-- Added smail compatibility.
-- Date specifications without times (e.g. "today") are interpreted as midnight
-  of the given day instead of the current time of that day.
-- Fixed -i when used with -Y -- it was always case sensitive before.
-- Updated t/functionality.t to avoid running gzip-related test cases when gzip
-  is not installed on the system.
-- Improved some error messages so that they prepend "grepmail: " as they
-  should
-- The "**" prefix on warnings has been changed to "grepmail:"
-- Cleaned up some warnings about ambiguous hash values
-- Added a warning about the version of perl required for new pattern features
-- -t flag renamed to -j
-- Fixed broken Gnus support
-- Improved test case for Gnus
+New in version 5.20:
+- Added speed testing to the distribution
+- Fixed Makefile.PL so that test modules would not be installed.
+- Changed testing to use PERLRUN instead of FULLPERLRUN, which is not
+  available with older versions of MakeMaker that ship with older versions of
+  Perl.
+- Fixed interactive installation problems.
+- Fixed broken searching of $HOME/mail, $HOME/Mail, and $HOME/Mailbox
+  directories when a mail folder can not be found. Changed $MAIL to $MAILDIR
+  since $MAIL usually points to the user's inbox. 
+- The user can now specify the cache file location with the -C flag.
+- Fixed compatibility problems with perl 5.005_01
 
 
 SOME NOTES
@@ -35,26 +25,6 @@ perl version:
 
 If you plan to use advanced pattern features such as "(?>...)", you will need
 to make sure that your version of perl supports them.
-
-
--s flag:
-
-*** WARNING ***
-
-As of version 4.91, the semantics of -s has changed. For example:
-  grepmail -s 1234 file
-now matches emails whose size is exactly 1234 bytes. Use 
-  grepmail -s '<1234' file
-if you prefer the older semantics.
-
-Caching:
-
-Caching appears to be working, but is currently disabled by default because
-the speedup is only 10-20%, and because it requires a file to be created in
-the user's directory. I'm hoping that the caching infrastructure can lead to
-further improvements. For example, we should cache the boundaries of
-attachments for the -M flag. Also, the current self-rolled implementation may
-be better served using Cache::FileCache instead.
 
 Complex queries:
 
@@ -163,23 +133,20 @@ documentation for your shell for details on how to do this.
 
 INSTALLATION PROBLEMS
 
-If "make test" fails, run
+If "make test" fails, run the particular test with:
 
-  make test TEST_VERBOSE=1
+  perl t/test_name.t
 
-and see which test(s) are failing. Please email, to the address below, the
-test##.stderr and test##.stdout files for the test, which are located in
-t/results. Also email the output of running the test with the -D flag. e.g.:
+and see which subtest are failing. Please email, to the address below, the
+output files for the test, which are located in t/temp and noted in the test
+output when the test fails. Also email the output of running the particular
+subtest with the -D flag. e.g.:
 
-  blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt \
-    > test##.debug
+  ./blib/script/grepmail --help > test_name.debug
 
-If you see errors about your timezone, and you are in an uncommon timezone, it
-may be the case that Date::Manip does not support your timezone yet. Try this:
-
-  perl -MDate::Manip -e 'print "TIMEZONE: ".&Date::Manip::Date_TimeZone."\n"'
-
-If you get an error, contact the author of Date::Manip.
+If the first date_manip test case fails, you are in a timezone that
+Date::Manip does not yet support.  You will need to contact the author of
+Date::Manip.
 
 For other bugs, see the section REPORTING BUGS below.
 
