@@ -108,7 +108,7 @@ sub Compute_Makefile_Attributes
     'clean' =>
       { FILES => 't/results/*.diff t/results/*.stdout t/results/*.stderr' },
     'EXE_FILES' => [ 'grepmail' ],
-    'PREREQ_PM' => { 'Date::Parse' => 0},
+    'PREREQ_PM' => { 'Date::Parse' => 0, 'Storable' => 0},
   );
 
   $makefile_attributes{'DIR'} = [];

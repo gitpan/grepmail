@@ -5,25 +5,24 @@ regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported, as are searches using
 logical operators.
 
-New in version 4.90:
-- Made Mail::Folder::SlowReader object-oriented
-- Removed FastReader from distribution. (It's no longer faster! Also, I
-  couldn't integrate it easily with the new object-oriented reader design.)
-- Fixed a bug where in some cases emails were not being converted to mbox
-  format before being printed
-- Made searches involving header-related constraints a bit faster
-- Added missing documentation for -F flag
-- Added -f flag to search based on message status. (Feature suggestion by
-  Richard D Alloway)
-- Fixed a bug where -X and -Y flags after a pattern would not be processed
-- Added experimental caching capability, which is perhaps 5% slower the first
-  time you run grepmail on a mail folder, and 10-20% faster on subsequent
-  runs. The cache is stored in ~/.grepmail-cache. You must edit the grepmail
-  file and set $USE_CACHING to true to use this feature. (Idea and initial
-  patch by terry jones)
+New in version 4.91:
+- Added missing dependency for Storable.
+- Storable now only necessary if you plan on using caching
+- Fixed a bug in test case 83
+- Changed -s to support "<", ">", "<=", ">=" and "-"
 
 
 SOME NOTES
+
+-s flag:
+
+*** WARNING ***
+
+As of version 4.91, the semantics of -s has changed. For example:
+  grepmail -s 1234 file
+now matches emails whose size is exactly 1234 bytes. Use 
+  grepmail -s '<1234' file
+if you prefer the older semantics.
 
 Caching:
 
@@ -89,14 +88,17 @@ The modules can be found here:
 Date::Parse (in TimeDate): http://search.cpan.org/search?dist=TimeDate
 Date::Manip:               http://search.cpan.org/search?dist=DateManip
 Digest::MD5:               http://search.cpan.org/search?dist=Digest-MD5
-Inline:                    http://search.cpan.org/search?dist=Inline
+Storable:                  http://search.cpan.org/search?dist=Storable
 
-Alternatively, installation can be done automatically using the CPAN module:
+The last module is only necessary if you intend on using the experimental
+caching feature.
+
+Installation can also be done automatically using the CPAN module:
 
   perl -MCPAN -e 'install Date::Parse'
   perl -MCPAN -e 'install Date::Manip'
   perl -MCPAN -e 'install Digest::MD5'
-  perl -MCPAN -e 'install Inline'
+  perl -MCPAN -e 'install Storable'
 
 
 INSTALLATION

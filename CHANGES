@@ -1,3 +1,10 @@
+New in version 4.91:
+- Added missing dependency for Storable.
+- Storable now only necessary if you plan on using caching
+- Fixed a bug in test case 83
+- Changed -s to support "<", ">", "<=", ">=" and "-". (Feature suggestion by
+  Jens Schleusener <Jens.Schleusener@debis-sfr.de>)
+
 New in version 4.90:
 - Made Mail::Folder::SlowReader object-oriented
 - Removed FastReader from distribution. (It's no longer faster! Also, I

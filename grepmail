@@ -2,7 +2,7 @@
 
 # grepmail
 
-$VERSION = '4.90';
+$VERSION = '4.91';
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
@@ -52,7 +52,7 @@ no strict;
 use strict;
 use vars qw( $VERSION $DEBUG );
 
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 my %HEADER_PATTERNS = (
 '^TO:' =>
@@ -347,9 +347,8 @@ sub _cache_read_next_email
     $self->{end_of_file} = 1;
   }
 
-  $self->{line_number} += ($self->{read_buffer} =~ tr/\n//);
-#  $self->{line_number} +=
-#    $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}];
+  $self->{line_number} +=
+    $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}];
 
   $self->{email_number}++;
 }
@@ -522,16 +521,21 @@ sub read_next_email
 package main;
 
 # Internal function return values.
-my $PRINT    = 0;
-my $DONE     = 1;
-my $SKIP     = 2;
-my $CONTINUE = 3;
-my $NONE     = 4;
-my $BEFORE   = 5;
-my $AFTER    = 6;
-my $ON       = 7;
-my $NODATE   = 8;
-my $BETWEEN  = 9;
+my $PRINT                 = 0;
+my $DONE                  = 1;
+my $SKIP                  = 2;
+my $CONTINUE              = 3;
+my $NONE                  = 4;
+my $BEFORE                = 5;
+my $AFTER                 = 6;
+my $ON                    = 7;
+my $NODATE                = 8;
+my $BETWEEN               = 9;
+my $LESS_THAN             = 10;
+my $LESS_THAN_OR_EQUAL    = 11;
+my $GREATER_THAN          = 12;
+my $GREATER_THAN_OR_EQUAL = 13;
+my $EQUAL                 = 14;
 
 #-------------------------------------------------------------------------------
 
@@ -621,6 +625,7 @@ my ($opts_ref,@remaining_arguments) = Get_Options(@ARGV);
 Print_Debug_Information($commandLine);
 
 sub ProcessDate($);
+sub ProcessSize($);
 sub GetFiles(@);
 
 # Check for -E flag incompatibilities.
@@ -666,12 +671,25 @@ else
   $dateRestriction = $NONE;
 }
 
+my ($sizeRestriction, $size1, $size2);
+
+if (defined $opts{'s'})
+{
+  ($sizeRestriction,$size1,$size2) = ProcessSize($opts{'s'});
+}
+else
+{
+  $sizeRestriction = $NONE;
+}
+
 dprint "PATTERN: $pattern\n";
 dprint "FILES: @remaining_arguments\n";
 dprint "DATE RESTRICTION: $dateRestriction\n";
 dprint "FIRST DATE: $date1\n" unless $dateRestriction == $NONE;
 dprint "SECOND DATE: $date2\n" unless $dateRestriction == $NONE;
-dprint "SIZE RESTRICTION: $opts{'s'}\n";
+dprint "SIZE RESTRICTION: $sizeRestriction\n";
+dprint "FIRST SIZE: $size1\n" unless $sizeRestriction == $NONE;
+dprint "SECOND SIZE: $size2\n" unless $sizeRestriction == $NONE;
 
 ValidatePattern($pattern);
 
@@ -1411,7 +1429,7 @@ sub Do_Simple_Pattern_Matching
 
   #----------------------------------------------------------------
 
-  my $matchesSize = length $$email < $opts{'s'};
+  my $matchesSize = IsInSize($email,$sizeRestriction,$size1,$size2);
 
   #----------------------------------------------------------------
 
@@ -1683,7 +1701,7 @@ sub ProcessMailFile
   }
   else
   {
-    Mail::Folder::SlowReader::SETUP_CACHE();
+    Mail::Folder::SlowReader::SETUP_CACHE() if $USE_CACHING;
     $folder_reader =
       new Mail::Folder::SlowReader( {
         'file_name' => $fileName,
@@ -1990,7 +2008,7 @@ sub AnalyzeHeader
   my $matchesSize = 1;
   if ($opts{'s'})
   {
-    $matchesSize = 0 if length $$email >= $opts{'s'};
+    $matchesSize = 0 if !IsInSize($email,$sizeRestriction,$size1,$size2);
 
     # Easy cases
     return ($SKIP,0)  if !$opts{'v'} && !$matchesSize;
@@ -2325,6 +2343,65 @@ sub ProcessDate($)
 
 #-------------------------------------------------------------------------------
 
+# Figure out what kind of size restriction they want, and what the sizes in
+# question are.
+sub ProcessSize($)
+{
+  my $sizestring = shift;
+
+  if ($sizestring =~ /^\s*(<|<=|>|>=)\s*(\d+)\s*$/i)
+  {
+    if ($1 eq '<')
+    {
+      $sizeRestriction = $LESS_THAN;
+    }
+    elsif ($1 eq '<=')
+    {
+      $sizeRestriction = $LESS_THAN_OR_EQUAL;
+    }
+    elsif ($1 eq '>')
+    {
+      $sizeRestriction = $GREATER_THAN;
+    }
+    elsif ($1 eq '>=')
+    {
+      $sizeRestriction = $GREATER_THAN_OR_EQUAL;
+    }
+
+    $size1 = $2;
+    $size2 = '';
+  }
+  elsif ($sizestring =~ /^\s*(\d+)\s*-\s*(\d+)\s*$/i)
+  {
+    $sizeRestriction = $BETWEEN;
+    $size1 = $1;
+    $size2 = $2;
+
+    # Swap the sizes if the user gave them backwards.
+    if ($size1 > $size2)
+    {
+      my $temp;
+      $temp = $size1;
+      $size1 = $size2;
+      $size2 = $temp;
+    }
+  }
+  elsif ($sizestring =~ /^\s*(\d+)\s*$/i)
+  {
+    $sizeRestriction = $EQUAL;
+    $size1 = $1;
+    $size2 = '';
+  }
+  else
+  {
+    reportAndExit "\"$sizestring\" is an invalid size specification. Use \"$0 -h\" for help";
+  }
+
+  return ($sizeRestriction,$size1,$size2);
+}
+
+#-------------------------------------------------------------------------------
+
 sub IsInDate($$$$)
 {
   my ($emailDate,$dateRestriction,$date1,$date2);
@@ -2348,10 +2425,39 @@ sub IsInDate($$$$)
 
 #-------------------------------------------------------------------------------
 
+sub IsInSize($$$$)
+{
+  my ($string,$sizeRestriction,$size1,$size2);
+  $string = shift @_;
+  $sizeRestriction = shift @_;
+  $size1 = shift @_;
+  $size2 = shift @_;
+
+  # Now we do the size checking.
+  return 1 if $sizeRestriction == $NONE;
+  return length $$string < $size1
+    if $sizeRestriction == $LESS_THAN;
+  return length $$string <= $size1
+    if $sizeRestriction == $LESS_THAN_OR_EQUAL;
+  return length $$string > $size1
+    if $sizeRestriction == $GREATER_THAN;
+  return length $$string >= $size1
+    if $sizeRestriction == $GREATER_THAN_OR_EQUAL;
+  return length $$string == $size1
+    if $sizeRestriction == $EQUAL;
+
+  return length $$string >= $size1 && length $$string <= $size2
+    if $sizeRestriction == $BETWEEN;
+
+  return 0;
+}
+
+#-------------------------------------------------------------------------------
+
 sub usage
 {
 <<EOF;
-usage: grepmail [--help] [-abBDFhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+usage: grepmail [--help] [-abBDFhHilmrRuv] [-s sizespec] [-d "datespec"] [[-eE] <expr>] <files...>
 EOF
 }
 
@@ -2364,15 +2470,15 @@ grepmail $VERSION
 
 usage:
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     <files...>
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [[-e] <pattern>] <files...>
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [-E <expr>] <files...>
 
@@ -2385,7 +2491,7 @@ compressed ASCII input is taken from STDIN.
 
 -a Use received date instead of sent date for -d matching
 -b Search must match body
--d Specify a date range (see below)
+-d Specify a required date range (see below)
 -D Debug mode
 -e Explicitly name pattern (when searching for strings beginning with "-")
 -E Specify a complex search expression
@@ -2403,7 +2509,7 @@ compressed ASCII input is taken from STDIN.
 -r Output the names of the files and the number of emails matching the
    expression
 -R Recurse directories
--s Restrict results to emails less than a certain size (in bytes)
+-s Specify a size range in bytes (see below)
 -S Ignore signatures
 -u Ensure that no duplicate emails are output
 -v Output emails that don't match the expression
@@ -2418,6 +2524,12 @@ form of:
   "05/18/93", "12:30 Dec 12th 1880", "8:00pm december tenth",
 - "before", "after", or "since", followed by a date as defined above,
 - "between <date> and <date>", where <date> is defined as above.
+
+Size constraints must be of the form of:
+- 12345: match size of exactly 12345
+- <12345, <=12345, >12345, >=12345: match size less than, less than or equal,
+  greater than, or greater than or equal to 12345
+- 10000-12345: match size between 10000 and 12345 inclusive
 EOF
 }
 
@@ -2429,15 +2541,15 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     <files...>
 
-  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [[-e] <pattern>] <files...>
 
-  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [-E <expr>] <files...>
 
@@ -2603,7 +2715,14 @@ Causes grepmail to recurse any directories encountered.
 
 =item B<-s>
 
-Return emails smaller than the size (in bytes) specified with this flag.
+Return emails which match the size (in bytes) specified with this flag. Note
+that this size includes the length of the header.
+
+Size constraints must be of the form of:
+ - 12345: match size of exactly 12345
+ - <12345, <=12345, >12345, >=12345: match size less than, less than or equal,
+   greater than, or greater than or equal to 12345
+ - 10000-12345: match size between 10000 and 12345 inclusive
 
 =item B<-S>
 
@@ -2667,9 +2786,9 @@ Count the number of emails. ("." matches every email.)
 
   grepmail -r . sent-mail
 
-Get all email larger than 2000 bytes about books
+Get all email between 2000 and 3000 bytes about books
 
-  grepmail books -s 2000 sent-mail
+  grepmail books -s 2000-3000 sent-mail
 
 Get all email that you mailed yesterday
 

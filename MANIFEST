@@ -240,3 +240,9 @@ t/results/test111.stdout.real          Correct STDOUT output file
 t/results/test111.stderr.real          Correct STDERR output file
 t/results/test112.stdout.real          Correct STDOUT output file
 t/results/test112.stderr.real          Correct STDERR output file
+t/results/test113.stdout.real          Correct STDOUT output file
+t/results/test113.stderr.real          Correct STDERR output file
+t/results/test114.stdout.real          Correct STDOUT output file
+t/results/test114.stderr.real          Correct STDERR output file
+t/results/test115.stdout.real          Correct STDOUT output file
+t/results/test115.stderr.real          Correct STDERR output file
