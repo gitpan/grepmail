@@ -1,8 +1,27 @@
-grepmail version 3.6
+grepmail
 
-Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
-and returns those emails that match it. Piped input is allowed, and date
-restrictions are supported.
+Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
+regular expression, and returns those emails that match it. Piped input is
+allowed, and date restrictions are supported.
+
+New in version 3.8:
+- Added a prototype engine to allow users to specialize grepmail at
+  installation time. (See below)
+- Fixed buggy mailbox detection algorithm
+- Fixed bug in identification of email headers.
+- Fixed bug in parsing timezones of emails. (Thanks to Wolfgang Weisselberg
+  <weisselberg@element5.de>)
+- Fixed bug in handling of date specifications like "2 days ago" and "2 weeks
+  ago"
+- Added -M switch, which causes grepmail to ignore non-text attachments.
+- Added "quiet mode", -q switch, which supresses warnings about directories,
+  non-mailbox ASCII files, binary files that can't be decompressed, etc.
+- Restructured code a bit. Moved file and STDIN processing out of main. The
+  whole email is now read before the match is made to the body, instead of
+  trying to match the pattern while reading the body. (This simplifies the
+  algorithms and makes -M support a lot easier, at the cost of increasing the
+  required memory slightly.) Now uses ungetc to put the test characters used
+  during file type detection back on the stream.
 
 New in version 3.7:
 - Added -D for debugging output
@@ -11,15 +30,46 @@ New in version 3.7:
   time at the expense of less flexibility. (e.g. You can't do "12pm January 5
   1997" any more)
 
-New in version 3.6:
-- No more temporary files! This addresses the security issues that a few
-  people have sent me email about. The new version uses a bit more memory,
-  depending on the size of the largest email in your mailbox. It's quite a bit
-  faster for piped input, though. Many thanks go to Joey Hess who supplied
-  insights and contributions toward making this release happen, especially the
-  buffering code.
-
 See the file CHANGES for a complete change history.
+
+INSTALLATION
+
+One of the problems software developers face is that certain design decisions
+can not be made at development time given uncertainty in the user's
+requirements. By pushing the resolution of those decisions until installation
+time (or run time), we can allow the user to participate in the decision
+process. Many approaches, like dynamic linking, fail because these design
+decisions span multiple implementation modules.
+
+Starting with version 3.8, grepmail includes an experimental engine that
+allows the developer to defer certain design decisions to the user, thereby
+allowing the user to create a custom script based on their own requirements.
+Whether or not I continue to support this capability is dependent upon the
+feedback I get from users and the cost of developing software using this
+model. (The latter is especially important because I don't have the supporting
+tools I need.)
+
+TO INSTALL: run "specialize grepmail.in" and follow the directions. If you are
+confused, just press enter twice and use the default grepmail script that is
+generated. There are several features you can choose to enable, depending on
+what Perl modules you have installed and what your performance requirements
+are. When choosing the features you want, keep the following in mind:
+
+- Date::Manip and Date::Parse are Perl modules that are used when the -d flag
+  is given. Using Date::Manip rather than Date::Parse will cause your script
+  to run about 60% slower, but Date::Manip has better error checking,
+  understands leap years, and supports a wider range of date specifications
+  (e.g. "2nd Thursday in July"). Having date support doesn't cost you anything
+  unless you use the -d flag.
+- Because most of the time is spent in file input and output, the other
+  options don't make much of a difference in performance. If you don't have
+  bzip2 or tzip installed you might want to remove support for it, but
+  grepmail should fail gracefully in either case.
+
+Please send any questions or suggestions you have.
+
+
+AUTHOR
 
 Written by David Coppit (coppit@cs.virginia.edu,
   http://www.cs.virginia.edu/~dwc3q/index.html)
@@ -30,6 +80,9 @@ Please send me any modifications you make. (for the better, that is. :) I have
 a suite of tests that I can give you if you ask. Keep in mind that I'm likely
 to turn down obscure features to avoid including everything but the kitchen
 sink.
+
+
+LICENSE
 
 This code is distributed under the GNU General Public License (GPL). See
 http://www.opensource.org/gpl-license.html and http://www.opensource.org/.

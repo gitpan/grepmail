@@ -1,3 +1,22 @@
+New in version 3.8:
+- Added a prototype engine to allow users to specialize grepmail at
+  installation time. (See below)
+- Fixed buggy mailbox detection algorithm
+- Fixed bug in identification of email headers.
+- Fixed bug in parsing timezones of emails. (Thanks to Wolfgang Weisselberg
+  <weisselberg@element5.de>)
+- Fixed bug in handling of date specifications like "2 days ago" and "2 weeks
+  ago"
+- Added -M switch, which causes grepmail to ignore non-text attachments.
+- Added "quiet mode", -q switch, which supresses warnings about directories,
+  non-mailbox ASCII files, binary files that can't be decompressed, etc.
+- Restructured code a bit. Moved file and STDIN processing out of main. The
+  whole email is now read before the match is made to the body, instead of
+  trying to match the pattern while reading the body. (This simplifies the
+  algorithms and makes -M support a lot easier, at the cost of increasing the
+  required memory slightly.) Now uses ungetc to put the test characters used
+  during file type detection back on the stream.
+
 New in version 3.7:
 - Added -D for debugging output
 - Now ignores ASCII files that don't look like mailboxes. Thanks to oak

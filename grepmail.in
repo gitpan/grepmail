@@ -1,16 +1,44 @@
-#!/usr/bin/perl
-
+<INFO>
+<TAGS>
+COMPRESSION: Support for compressed mailboxes
+GZIP: Support for gzip'd mailboxes
+TZIP: Support for tzip'd mailboxes
+BZIP: Support for bzip'd mailboxes
+DATES: Support for date restrictions on searches
+DATE_MANIP: Use the Date::Manip module for date support (flexible)
+DATE_PARSE: Use the Date::Parse module for date support (fast)
+DEBUG: Support for debug mode
+</TAGS>
+<CONSTRAINTS>
+COMPRESSION <-> GZIP || TZIP || BZIP
+DATES -> (DATE_MANIP && !DATE_PARSE) || (!DATE_MANIP && DATE_PARSE)
+!DATES -> !DATE_MANIP && !DATE_PARSE
+</CONSTRAINTS>
+<DEFAULT>
+COMPRESSION GZIP TZIP BZIP
+DATES DATE_PARSE
+DEBUG
+</DEFAULT>
+</INFO>
 # use perl                                  -*- mode: Perl; -*-
 eval 'exec perl -S $0 "$@"'
   if $running_under_some_shell;
 
 use vars qw($running_under_some_shell);         # no whining!
 
-# grepmail version 3.7
+# grepmail
 
-# Grepmail searches a normal, gzip'd, or bzip2'd mailbox for a given regular
-# expression and returns those emails that match the query. It also supports
-# piped compressed or ascii input, and searches constrained by date. 
+$VERSION = 3.8;
+
+# Grepmail searches a<COMPRESSION> normal<GZIP>, gzip'd</GZIP><TZIP>, tzip'd</TZIP><BZIP>, or bzip2'd</BZIP></COMPRESSION> mailbox for a given
+# regular expression and returns those emails that match the query.<COMPRESSION || DATES> It also
+# supports </COMPRESSION || DATES><COMPRESSION>piped compressed or ascii input</COMPRESSION><DATES><COMPRESSION>, and </COMPRESSION>searches constrained by date</DATES><COMPRESSION || DATES>.</COMPRESSION || DATES> 
+
+# NOTICE: This file was generated using a program specializer. Please include
+# the file "OPTIONS", which was generated during installation, with any
+# correspondence to the author. Please do not redistribute this file, but
+# rather the original distribution, complete with input file and
+# specialization program.
 
 # If you would like to be notified of updates, send email to me at
 # coppit@cs.virginia.edu. The latest version is always at
@@ -48,7 +76,7 @@ use vars qw($running_under_some_shell);         # no whining!
 
 use Getopt::Std;
 
-use vars qw(%opts $pattern $commandLine);
+use vars qw(%opts $pattern $commandLine $VERSION);
 
 # We need to do this early to check for the -D flag when setting the DEBUG
 # constant
@@ -59,10 +87,18 @@ BEGIN
   # Print usage error if no arguments given
   print "No arguments given. grepmail -h for help.\n" and exit if (!@ARGV);
 
-  getopt("ed",\%opts);
+  # So we don't have to test whether they are defined later.
+  <DEBUG>$opts{'D'} = </DEBUG><DATES>$opts{'d'} = </DATES>$opts{'e'} = $opts{'i'} = $opts{'q'} = 0;
+  $opts{'h'} = $opts{'b'} = $opts{'v'} = $opts{'l'} = $opts{'r'} = 0;
+  $opts{'M'} = $opts{'m'} = 0;
+
+  getopt("e<DATES>d</DATES>",\%opts);
+
 }
 
-use constant DEBUG => $opts{D} || 0;
+<DEBUG>
+use constant DEBUG => $opts{'D'} || 0;
+</DEBUG>
 
 require 5.00396;
 
@@ -70,37 +106,7 @@ use strict;
 use FileHandle;
 use Carp;
 
-sub usage
-{
-<<EOF;
-usage: grepmail [-bDhilmrv] [[-e] <expr>] [-d \"datespec\"] <files...>
-
--b Search must match body
--d Specify a date range (see below)
--D Debug mode
--e Explicitely name expr (when searching for strings beginning with "-")
--h Search must match header
--i Ignore case in the search expression
--l Output the names of files having an email matching the expression
--m Append "X-Mailfolder: <folder>" to all headers to indicate in which folder
-   the match occurred
--r Output the names of the files and the number of emails matching the
-   expression
--v Output emails that don't match the expression
-
-Date specifications must be of the form of:
-a date like "today", "1st thursday in June 1992", "05/18/93",
-  "12:30 Dec 12th 1880", "8:00pm december tenth",
-OR "before", "after", or "since", followed by a date as defined above,
-OR "between <date> and <date>", where <date> is defined as above.
-
-Files can be plain ASCII or ASCII files compressed with gzip, tzip, or bzip2.
-You can also pipe normal or compressed ASCII to grepmail.
-EOF
-}
-
-#-------------------------------------------------------------------------------
-
+<DEBUG>
 sub dprint
 {
   return unless DEBUG;
@@ -113,6 +119,7 @@ sub dprint
     print "DEBUG: $line\n";
   }
 }
+</DEBUG>
 
 #-------------------------------------------------------------------------------
 
@@ -120,15 +127,7 @@ sub cleanExit
 {
   my $message;
 
-  if (@_)
-  {
-    $message = shift;
-  }
-  else
-  {
-    $message = "Cancelled";
-  }
-
+  $message = shift || "Cancelled";
   print "$message.\n";
 
   exit;
@@ -136,9 +135,12 @@ sub cleanExit
 
 #-------------------------------------------------------------------------------
 
+<DEBUG>
 dprint "Command line was:";
 dprint "  $commandLine";
+</DEBUG>
 
+<DATES>
 # At this point, we have 4 cases:
 # - The -d was specified without a pattern before it, in which case $opts{d}
 #   will be set. An implicit "." is used unless -e was specified.
@@ -146,20 +148,21 @@ dprint "  $commandLine";
 # - There is no -d in $ARGV[1], and a pattern or file is in $ARGV[0]. Take
 #   is as a pattern if -e was not given.
 # - They did something like "grepmail -h", in which case do nothing
-if ($opts{d})
+if ($opts{'d'})
 {
-  $pattern = "." if !$opts{e};
+  $pattern = "." unless $opts{'e'};
 }
 elsif ($#ARGV > 0 && $ARGV[1] eq "-d")
 {
   $pattern = shift @ARGV;
   getopt("d",\%opts);
 }
-elsif (!$opts{e} && @ARGV)
+els</DATES>if (!$opts{'e'} && @ARGV)
 {
   $pattern = shift @ARGV;
 }
 
+<DEBUG>
 if (DEBUG)
 {
   dprint "Options are:";
@@ -174,24 +177,32 @@ if (DEBUG)
     dprint "  $i";
   }
 }
+</DEBUG>
 
-if ($opts{e})
+if ($opts{'e'})
 {
-  print "You specified two search patterns.\n" and exit if (defined $pattern);
-  
-  $pattern = $opts{e};
+<DATES>
+  print "You specified two search patterns.\n" and exit if defined $pattern;
+</DATES>
+  $pattern = $opts{'e'};
 }
 elsif (!defined $pattern)
 {
+<DATES>
   # The only time you can't specify the pattern is when -d is being used.
+</DATES>
   # This should catch people who do "grepmail -h" thinking it's help.
-  print usage and exit if !$opts{d};
+  print usage() and exit<DATES> unless $opts{'d'}</DATES>;
 
+<DATES>
   $pattern = ".";
+</DATES>
 }
+<DATES>
 
-if ($opts{d})
+if ($opts{'d'})
 {
+<DATE_PARSE>
   unless (eval "require Date::Parse")
   {
     print "You specified -d, but do not have Date::Parse. Get it from CPAN.\n";
@@ -199,39 +210,41 @@ if ($opts{d})
   }
 
   import Date::Parse;
+</DATE_PARSE>
+<DATE_MANIP>
+  unless (eval "require Date::Manip")
+  {
+    print "You specified -d, but do not have Date::Manip. Get it from CPAN.\n";
+    exit;
+  }
+
+  import Date::Manip;
+</DATE_MANIP>
 }
+</DATES>
 
-#-------------------------------------------------------------------------------
-
-sub IsMailbox
-{
-my $fileHandle = shift @_;
-
-read($fileHandle,$_[0],500) unless $_[0] ne '';
-
-return 1 if $_[0] =~ /^from: /im &&
-            $_[0] =~ /^subject: /im &&
-            $_[0] =~ /^date: /im;
-return 0;
-}
-#-------------------------------------------------------------------------------
+############################# MAIN PROGRAM #####################################
 
 # Make the pattern insensitive if we need to
-$pattern = "(?i)$pattern" if ($opts{i});
+$pattern = "(?i)$pattern" if ($opts{'i'});
+<DATES>
 
 my ($dateRestriction, $date1, $date2);
 
-if ($opts{d})
+if ($opts{'d'})
 {
-  ($dateRestriction,$date1,$date2) = ProcessDate($opts{d});
+  ($dateRestriction,$date1,$date2) = ProcessDate($opts{'d'});
 }
 else
 {
   $dateRestriction = "none";
 }
+</DATES>
 
+<DEBUG>
 dprint "PATTERN: $pattern\n";
 dprint "FILES: @ARGV\n";
+</DEBUG>
 
 # Catch everything I can...
 $SIG{PIPE} = \&cleanExit;
@@ -243,324 +256,477 @@ $SIG{TERM} = \&cleanExit;
 # If the user provided input files...
 if (@ARGV)
 {
-  # For each input file...
-  foreach my $file (@ARGV)
+  HandleInputFiles(@ARGV);
+}
+# Using STDIN
+else
+{ 
+  HandleStandardInput();
+}
+
+#-------------------------------------------------------------------------------
+
+sub PutBackString
+{
+  my $fileHandle = shift;
+  my $string = shift;
+
+  while ($string ne '')
   {
-    dprint "######################################################";
+    my $char = chop $string;
+    $fileHandle->ungetc(ord($char));
+  }
+}
+
+#-------------------------------------------------------------------------------
+
+sub IsMailbox
+{
+my $fileHandle = shift @_;
+
+# Read whole paragraphs
+local $/ = "\n\n";
+
+# Read a paragraph to get the header. (If we have to.)
+my $buffer = <$fileHandle>;
+
+my $returnVal;
+if ($buffer =~ /^From: /im && $buffer =~ /^Date: /im)
+{
+  $returnVal = 1;
+}
+else
+{
+  $returnVal = 0;
+}
+
+PutBackString($fileHandle,$buffer);
+
+return $returnVal;
+}
+
+#-------------------------------------------------------------------------------
+
+sub HandleInputFiles
+{
+  my @files = @_;
+
+  # For each input file...
+  foreach my $file (@files)
+  {
+<DEBUG>
+    dprint '#'x70;
     dprint "Processing file $file";
+</DEBUG>
 
     # First of all, silently ignore empty files...
     next if -z $file;
 
     # ...and also ignore directories.
-    warn "** Skipping directory: '$file' **\n" and next if -d $file;
+    if (-d $file)
+    {
+      warn "** Skipping directory: '$file' **\n" unless $opts{'q'};
+      next;
+    }
 
     my $fileHandle = new FileHandle;
 
+<COMPRESSION>
     # If it's not a compressed file
-    if ($file !~ /\.(gz|Z|bz2|tz)$/)
+    if ($file !~ /\.(<GZIP>gz|Z<BZIP || TZIP>|</BZIP || TZIP></GZIP><BZIP>bz2<TZIP>|</TZIP></BZIP><TZIP>tz</TZIP>)$/)
     {
-      warn "** Skipping binary file: '$file' **\n" and next if -B $file;
+</COMPRESSION>
+      if (-B $file)
+      {
+        warn "** Skipping binary file: '$file' **\n" unless $opts{'q'};
+        next;
+      }
 
       $fileHandle->open($file) || cleanExit "Can't open $file";
+<COMPRESSION>
     }
+<TZIP>
     # If it is a tzipped file
     elsif ($file =~ /\.tz$/)
     {
+<DEBUG>
       dprint "Calling tzip to decompress file.";
+</DEBUG>
       $fileHandle->open("tzip -cd $file|") 
         or cleanExit "Can't execute tzip for file $file";
     }
+</TZIP>
+<GZIP>
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
+<DEBUG>
       dprint "Calling gunzip to decompress file.";
+</DEBUG>
       $fileHandle->open("gunzip -c $file|")
         or cleanExit "Can't execute gunzip for file $file";
     }
+</GZIP>
+<BZIP>
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
+<DEBUG>
       dprint "Calling bzip2 to decompress file.";
+</DEBUG>
       $fileHandle->open("bzip2 -dc $file|")
         or cleanExit "Can't execute bzip2 for file $file";
     }
+</BZIP>
+</COMPRESSION>
 
-    my $buffer = '';
+    if (!IsMailbox($fileHandle))
+    {
+      warn "** Skipping non-mailbox ASCII file: '$file' **\n" unless $opts{'q'};
+      next;
+    }
 
-    warn "** Skipping non-mailbox ASCII file: '$file' **\n" and next
-      unless IsMailbox($fileHandle,$buffer);
-
-    ProcessMailFile($fileHandle,$file,$buffer);
+    ProcessMailFile($fileHandle,$file);
     $fileHandle->close();
   }
 }
-# Using STDIN
-else
-{ 
+
+#-------------------------------------------------------------------------------
+
+sub HandleStandardInput
+{
+<DEBUG>
   dprint "Handling STDIN";
+</DEBUG>
 
   # We have to implement our own -B and -s, because STDIN gets eaten by them
   binmode STDIN;
 
   my ($testChars,$isEmpty,$isBinary);
 
+  my $fileHandle = new FileHandle;
+  $fileHandle->open('-');
+
   $isEmpty = 0;
   $isBinary = 0;
 
-  # Be sure to read at least 500 characters so that IsMailbox will work
-  # correctly
-  $isEmpty = 1 if !read(STDIN,$testChars,500);
+  my $readResult = read($fileHandle,$testChars,200);
+
+  cleanExit "Can't read from standard input" unless defined $readResult;
+
+  $isEmpty = 1 if $readResult == 0;
+
+  cleanExit "No data on standard input" if $isEmpty;
 
   # This isn't the "real" way to do -B, but it should work okay.
   $isBinary = 1 if !$isEmpty &&
                     ($testChars =~ /\000/ || $testChars =~ /[\200-\377]/);
 
+  PutBackString($fileHandle,$testChars);
+
+<COMPRESSION>
   # If it looks binary and is non-empty, try to uncompress it. Here we're
   # calling another copy of grepmail through the open command.
+</COMPRESSION>
+<!COMPRESSION>
+  # If it looks binary skip it.
+</!COMPRESSION>
   if ($isBinary)
   {
+<!COMPRESSION>
+    warn "** Skipping binary STDIN: **\n" unless $opts{'q'};
+    return;
+</!COMPRESSION>
+<COMPRESSION>
     my $filter;
 
     # This seems to work. I'm not sure what the "proper" way to distinguish
-    # between gzip'd and bzip2'd and tzip'd files is.
+    # between <GZIP>gzip'd</GZIP> <BZIP>and bzip2'd</BZIP> <TZIP>and tzip'd</TZIP> files is.
+<TZIP>
     if ($testChars =~ /^TZ/)
     {
+<DEBUG>
       dprint "Trying to decompress using tzip.";
+</DEBUG>
       $filter = "tzip -dc";
     }
-    elsif ($testChars =~ /^BZ/)
+</TZIP>
+<BZIP>    <TZIP>elsif</TZIP><!TZIP>if</!TZIP> ($testChars =~ /^BZ/)
     {
+<DEBUG>
       dprint "Trying to decompress using bzip2.";
+</DEBUG>
       $filter = "bzip2 -d";
     }
-    else
-    {
+</BZIP>
+    <BZIP || TZIP>else
+    {</BZIP || TZIP>
+<GZIP>
+<DEBUG>
       dprint "Trying to decompress using gunzip.";
+</DEBUG>
       $filter = "gunzip -c";
-    }
+</GZIP>
+<!GZIP>
+    warn "** Skipping binary STDIN: **\n" unless $opts{'q'};
+    return;
+</!GZIP>
+    <BZIP || TZIP>}</BZIP || TZIP>
 
     # Here we invoke another copy of grepmail with a filter in front. We
     # send it the test characters, then whatever is left on stdin.
-    my $fileHandle = new FileHandle;
-    $fileHandle->open("|$filter|$commandLine")
+    my $newGrepmail = new FileHandle;
+    $newGrepmail->open("|$filter|$commandLine")
       or cleanExit "Can't execute '$filter' on stdin";
-    print $fileHandle $testChars;
-    print $fileHandle <STDIN>;
-    close $fileHandle;
+    while (!eof $fileHandle)
+    {
+      my $temp = <$fileHandle>;
+      print $newGrepmail $temp;
+    }
+    close $newGrepmail;
+</COMPRESSION>
   }
   # Otherwise process it directly
   else
   {
-    warn "** Skipping non-mailbox standard input **\n" and exit
-      unless IsMailbox(*STDIN,$testChars);
+    if (!IsMailbox($fileHandle))
+    {
+      warn "** Skipping non-mailbox standard input **\n" unless $opts{'q'};
+      return;
+    }
 
-    # It's really bad to pass the test characters with the input stream,
-    # but I don't know of another way to do what I want.
-    # (Well, okay, I could create a class that encapsulates STDIN and uses a
-    # buffer to allow you to read without removing data from the stream. When
-    # the buffer is empty, it reads from the real STDIN.)
-    ProcessMailFile(*STDIN,"Standard input",$testChars);
+    ProcessMailFile($fileHandle,"Standard input");
   }
 }
 
 #-------------------------------------------------------------------------------
 
-# $firstChars is used because the caller might have read some stuff off of
-# STDIN, and couldn't put it back for use here.
 sub ProcessMailFile ($$)
 {
 my $fileHandle = shift @_;
 my $fileName = shift @_;
-my $firstChars = shift @_;
 
-my ($numberOfMatches,$matchesBody,$matchesHeader,$paragraph,$email_buffer,
-    $header_buffer);
+# $header_buffer stores the header for the current email. $body_buffer stores
+# the body for the current email. $next_header stores the header for the next
+# email, in case we encounter it while looking for the end of the current
+# email.
 
-$email_buffer = '';
-$header_buffer = undef;
+# I'd really like to call PushBackString instead of storing $next_header, but
+# that way is much slower, and fails unpredictably. :( The next best solution
+# is to write a wrapper class for FileHandle that allows pushbacks, and stores
+# them in an internal buffer. Too much work for now though...
+
+my ($numberOfMatches,$header_buffer,$body_buffer,$next_header);
+
+$next_header = undef;
 $numberOfMatches = 0;
 
 # Read whole paragraphs
-$/ = "\n\n";
+local $/ = "\n\n";
 
 # This is the main loop. It's executed once for each email
 while (!eof($fileHandle))
 {
-  $email_buffer='';
-  
-  # Read the header for the first email
-  if (!defined $header_buffer)
+  $header_buffer = '';
+  $body_buffer = '';
+
+  if (!defined $next_header)
   {
+<DEBUG>
     dprint "Getting header for first email.";
-    if (defined $firstChars)
-    {
-      $paragraph = $firstChars;
-      undef $firstChars;
-      $paragraph .= <$fileHandle>;
-    }
-    else
-    {
-      $paragraph = <$fileHandle>;
-    }
+</DEBUG>
+    $header_buffer = <$fileHandle>;
   }
   else
   {
+<DEBUG>
     dprint "Processing buffered header.";
-    $paragraph = $header_buffer;
-    undef $header_buffer;
+</DEBUG>
+    $header_buffer = $next_header;
+
+    undef $next_header;
   }
 
-  $email_buffer .= $paragraph;
-
+<DEBUG>
   if (DEBUG)
   {
-    dprint "------------------------------------------------------";
+    dprint '-'x70;
     dprint "Processing email:";
-    $paragraph =~ /^(from:.*)$/im;
+    $header_buffer =~ /^(From:.*)$/im;
     dprint "  $1";
-    $paragraph =~ /^(subject:.*)$/im;
+    $header_buffer =~ /^(Subject:.*)$/im;
     dprint "  $1";
   }
-
-  # Save the header for later when we check the date.
-  my $header = $paragraph;
-
-  my ($matchesHeader,$matchesBody); 
+</DEBUG>
 
   # See if the header matches the pattern
-  $matchesHeader = ($paragraph =~ /$pattern/om);
+  my $matchesHeader = ($header_buffer =~ /$pattern/om) || 0;
+
+  #----------------------------------------------------------------
+
+<DEBUG>
+  dprint "Checking for early printout based on header.";
+</DEBUG>
 
   # At this point, we might know enough to print the email.
   if (
-      ($opts{h} && $opts{b} && $opts{v} && !$matchesHeader) ||
-      ($opts{h} && !$opts{b} && $opts{v} && !$matchesHeader) ||
-      (!$opts{h} && !$opts{b} && !$opts{v} && $matchesHeader)
+      ($opts{'h'} && $opts{'b'} && $opts{'v'} && !$matchesHeader) ||
+      ($opts{'h'} && !$opts{'b'} && $opts{'v'} && !$matchesHeader) ||
+      (!$opts{'h'} && !$opts{'b'} && !$opts{'v'} && $matchesHeader)
      )
   {
-    dprint "Checking for early printout based on header.";
+<DATES>
+<DEBUG>
+    dprint "Found a pattern match. Checking date.";
+</DEBUG>
 
     # Skip to the next email if the date is wrong.
-    if (!CheckDate(\$header))
+    if (!CheckDate(\$header_buffer))
     {
+<DEBUG>
       dprint "Header failed date constraint.";
-      SkipToNextEmail($fileHandle,\$header_buffer);
+</DEBUG>
+      SkipToNextEmail($fileHandle,\$next_header);
       next;
     }
+</DATES>
 
+<DEBUG>
     dprint "Doing an early printout based on header match.";
+</DEBUG>
 
-    if ($opts{l})
+    if ($opts{'l'})
     {
       print "$fileName\n";
 
       # We can return since we found at least one email that matches.
       return;
     }
-    elsif ($opts{r})
+    elsif ($opts{'r'})
     {
       $numberOfMatches++;
-      SkipToNextEmail($fileHandle,\$header_buffer);
+      SkipToNextEmail($fileHandle,\$next_header);
     }
     else
     {
-      PrintEmail($fileHandle,$fileName,$email_buffer,\$header_buffer);
+      GetRestOfBody($fileHandle,\$body_buffer,\$next_header);
+      PrintEmail($fileName,$header_buffer,$body_buffer);
     }
 
     next;
   }
 
+  #----------------------------------------------------------------
+
+<DEBUG>
+  dprint "Checking for early abort based on header.";
+</DEBUG>
+
   # We might have enough information to abort early
   if (
-      ($opts{h} && $opts{b} && !$opts{v} && !$matchesHeader) ||
-      ($opts{h} && !$opts{b} && !$opts{v} && !$matchesHeader) ||
-      ($opts{h} && !$opts{b} && $opts{v} && !$matchesHeader) ||
-      (!$opts{h} && !$opts{b} && $opts{v} && $matchesHeader)
+      ($opts{'h'} && $opts{'b'} && !$opts{'v'} && !$matchesHeader) ||
+      ($opts{'h'} && !$opts{'b'} && !$opts{'v'} && !$matchesHeader) ||
+      ($opts{'h'} && !$opts{'b'} && $opts{'v'} && !$matchesHeader) ||
+      (!$opts{'h'} && !$opts{'b'} && $opts{'v'} && $matchesHeader)
      )
   {
+<DEBUG>
     dprint "Doing an early abort based on header.";
+</DEBUG>
 
-    SkipToNextEmail($fileHandle,\$header_buffer);
+    SkipToNextEmail($fileHandle,\$next_header);
     next;
   }
 
+  #----------------------------------------------------------------
+
+<DEBUG>
   dprint "Searching body for pattern.";
+</DEBUG>
 
-  # Now search the body for the pattern
-  do
-  {
-    $paragraph = <$fileHandle>;
-    $email_buffer .= $paragraph;
-  }
-  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/) &&
-        ($paragraph !~ /$pattern/om));
+  GetRestOfBody($fileHandle,\$body_buffer,\$next_header);
 
-  if (eof)
+  my $matchesBody;
+
+  # Ignore the MIME attachments if -M was specified
+  if ($opts{'M'} &&
+      ($header_buffer =~ /^Content-Type:.*boundary="([^"]*)"/im))
   {
-    dprint "Found EOF.";
-    $matchesBody = 0;
-  }
-  elsif ($paragraph =~ /^\n?From .*\d{4}/)
-  {
-    dprint "Found next email's header, buffering.";
-    $header_buffer = $paragraph;
-    $matchesBody = 0;
+    my $boundary = $1;
+
+    # Escape any metacharacters
+    $boundary =~ s/([\?\*\$\|\^\+\[\]\(\)])/\\$1/g;
+
+    my $tempBody = $body_buffer;
+
+    # Strip out any attachments that aren't textual
+    $tempBody =~ s/$boundary\nContent-Type: (?!text).*?(?=$boundary)//igs;
+
+    $matchesBody = ($tempBody =~ /$pattern/om) || 0;
   }
   else
   {
-    $matchesBody = ($paragraph =~ /$pattern/om);
+    $matchesBody = ($body_buffer =~ /$pattern/om) || 0;
   }
 
   my $isMatch = (
-                 ($opts{b} && $opts{h} && $matchesBody && $matchesHeader) ||
-                 ($opts{b} && !$opts{h} && $matchesBody) ||
-                 (!$opts{b} && $opts{h} && $matchesHeader) ||
-                 (!$opts{b} && !$opts{h} && ($matchesBody || $matchesHeader))
+                 ($opts{'b'} && $opts{'h'} && $matchesBody && $matchesHeader) ||
+                 ($opts{'b'} && !$opts{'h'} && $matchesBody) ||
+                 (!$opts{'b'} && $opts{'h'} && $matchesHeader) ||
+                 (!$opts{'b'} && !$opts{'h'} && ($matchesBody || $matchesHeader))
                 );
 
-  $isMatch = !$isMatch if $opts{v};
+  $isMatch = !$isMatch if $opts{'v'};
 
   # If the match occurred in the right place...
   if ($isMatch)
   {
-    dprint "Found a pattern match on the body.";
+<DATES>
+<DEBUG>
+    dprint "Found a pattern match. Checking date.";
+</DEBUG>
 
     # Skip to the next email if the date is wrong.
-    if (!CheckDate(\$header))
+    if (!CheckDate(\$header_buffer))
     {
+<DEBUG>
       dprint "Failed date constraint.";
+</DEBUG>
 
-      SkipToNextEmail($fileHandle,\$header_buffer);
+      SkipToNextEmail($fileHandle,\$next_header);
       next;
     }
+</DATES>
 
-    if ($opts{l})
+<DEBUG>
+    dprint "Email matches all patterns and constraints.";
+</DEBUG>
+
+    if ($opts{'l'})
     {
       print "$fileName\n";
 
       # We can return since we found at least one email that matches.
       return;
     }
-    elsif ($opts{r})
+    elsif ($opts{'r'})
     {
       $numberOfMatches++;
-      SkipToNextEmail($fileHandle,\$header_buffer);
     }
     else
     {
-      PrintEmail($fileHandle,$fileName,$email_buffer,\$header_buffer);
+      PrintEmail($fileName,$header_buffer,$body_buffer);
     }
   }
   else
   {
+<DEBUG>
     dprint "Did not find a pattern match on the body.";
-
-    # It doesn't match the pattern
-    SkipToNextEmail($fileHandle,\$header_buffer);
+</DEBUG>
   }
 }
 
- print "$fileName: $numberOfMatches\n" if ($opts{r});
+print "$fileName: $numberOfMatches\n" if ($opts{'r'});
 }
 
 #-------------------------------------------------------------------------------
@@ -568,92 +734,98 @@ while (!eof($fileHandle))
 sub SkipToNextEmail($\$)
 {
   my $fileHandle = shift;
-  my $header_buffer = shift;
+  my $next_header = shift;
   my $paragraph;
 
+<DEBUG>
   dprint "Skipping to next email.";
+</DEBUG>
 
   # If we have something buffered, it's the beginning of the next email
   # address, so we don't need to do anything. Joy.
-  return if defined $$header_buffer;
+  return if defined $$next_header;
 
   do
   {
     $paragraph = <$fileHandle>;
   }
-  while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
+  while (!eof($fileHandle) && ($paragraph !~ /^\n?From .*\d:\d+:\d.* \d{4}/i)) ;
 
-  # Buffer if we went too far.
-  $$header_buffer = $paragraph if (!eof);
+  # Buffer if we went too far. Zap the starting newline while we're at it.
+  ($$next_header) = $paragraph =~ /^\n?(.*)/s if (!eof($fileHandle));
+}
+
+#-------------------------------------------------------------------------------
+
+sub GetRestOfBody($\$\$)
+{
+  my $fileHandle = shift;
+  my $body_buffer = shift;
+  my $next_header = shift;
+
+  return if defined $$next_header;
+
+  # Read the entire email body into the buffer
+  my $doneLooking = 0;
+  do
+  {
+    my $paragraph = <$fileHandle>;
+
+    if (defined $paragraph)
+    {
+      if ($paragraph =~ /^(\n?)(From .*\d:\d+:\d.* \d{4}.*)/is)
+      {
+<DEBUG>
+        dprint "Found next email's header, buffering.";
+</DEBUG>
+        $$body_buffer .= $1;
+        $$next_header = $2;
+        $doneLooking = 1;
+      }
+      else
+      {
+        $$body_buffer .= $paragraph;
+      }
+    }
+
+    if (eof($fileHandle))
+    {
+<DEBUG>
+      dprint "Found EOF.";
+</DEBUG>
+      $doneLooking = 1;
+    }
+  }
+  while (!$doneLooking);
 }
 
 #-------------------------------------------------------------------------------
 
 sub PrintEmail($$$\$)
 {
-  my $fileHandle = shift;
   my $fileName = shift;
-  my $email_buffer = shift;
-  my $header_buffer = shift;
-  
-  # Read in and process parts of message we already have.
-  my ($paragraph, @paragraphs);
-  foreach $paragraph (split(/\n\n/,$email_buffer))
-  {
-    push @paragraphs, "$paragraph\n\n";
-  }
-  undef $paragraph;
-  
-  # Read in remainder of message, if necessary.
-  if ((!defined $$header_buffer) && (!eof))
-  {
-    do
-    {
-      $paragraph = <$fileHandle>;
-      push @paragraphs, $paragraph;
-    }
-    while (!eof && ($paragraph !~ /^\n?From .*\d{4}/)) ;
+  my $header = shift;
+  my $body = shift;
 
-    # Buffer if we read too far.
-    $$header_buffer = $paragraph if (!eof);
-  }
-
+<DEBUG>
   dprint "Printing email.";
-  $paragraph = shift @paragraphs;
+</DEBUG>
 
-  # Strip any newline at the start of the header. Because the pattern is
-  # "\n\n", there will sometimes be an extra newline if there are an odd
-  # number of newlines between emails.
-  $paragraph =~ s/^\n(From .*\d{4})/$1/;
-
-  # Print the mailfolder in the headers if -m was given
-  if ($opts{"m"})
+  # Add the mailfolder to the headers if -m was given
+  if ($opts{'m'})
   {
-    chop $paragraph;
-    $paragraph .= "X-Mailfolder: $fileName\n\n";
+    $header =~ s/\n+$/\n/s;
+    $header .= "X-Mailfolder: $fileName\n\n";
   }
-  print $paragraph;
+  print $header;
 
-  do
-  {
-    $paragraph = shift @paragraphs;
-
-    print $paragraph if $paragraph !~ /^\n?From .*\d{4}/;
-
-    # Print the extra newline that appears when there are an odd number of
-    # newlines bewteen messages. Basically I consider the newline to be part
-    # of the previous message, although I don't think it matters.
-    if ($paragraph =~ /^\nFrom .*\d{4}/)
-    {
-      $paragraph =~ s/^\n//;
-      print "\n";
-    }
-  }
-  while (@paragraphs && ($paragraph !~ /^\n?From .*\d{4}/)) ;
+  # Print whatever body we've read already.
+  print $body;
 }
 
 #-------------------------------------------------------------------------------
-    
+
+<DATES>
 sub CheckDate($)
 {
 my $emailref = shift;
@@ -661,19 +833,42 @@ my ($emailDate, $isInDate);
 $emailDate = "";
 $isInDate = 0;
 
-if ($opts{d})
+my ($header) = $$emailref =~ /^(.*?)\n\n/s;
+
+# RFC 822 allows header lines to be continued on the next line, in which case
+# they must be preceded by whitespace. Let's remove the continuations.
+$header =~ s/\n\s+/ /gs;
+
+if ($opts{'d'})
 {
   # The email might not have a date. In this case, print it out anyway.
-  if ($$emailref =~ /^Date:\s*(\S*\s*\S*\s*\S*\s*\S*\s*\S*)/m)
+  if ($header =~ /^Date:\s*(.*)$/im)
   {
+<DEBUG>
     dprint "Date in email is: $1.";
+</DEBUG>
 
+<DATE_PARSE>
     $emailDate = str2time($1);
+</DATE_PARSE>
+<DATE_MANIP>
+    my $fixedDate = $1;
+
+    # We have to remove "(GMT+500)" from the end for Date::Manip
+    $fixedDate =~ s/\(GMT[^\)]*\)$//;
+
+    # We have to change +500 to +0500 for Date::Manip
+    $fixedDate =~ s/([\+\-])(\d\d\d)$/$1.'0'.$2/e;
+
+    $emailDate = ParseDate($fixedDate);
+</DATE_MANIP>
     $isInDate = IsInDate($emailDate,$dateRestriction,$date1,$date2);
   }
   else
   {
+<DEBUG>
     dprint "No date found in email.";
+</DEBUG>
 
     $isInDate = 1;
   }
@@ -688,6 +883,7 @@ return $isInDate;
 }
 
 #-------------------------------------------------------------------------------
+<DATE_PARSE>
 
 sub ParseDate
 {
@@ -706,19 +902,23 @@ sub ParseDate
   }
   elsif ($time =~ /^\s*(\d+) days? ago\s*$/i)
   {
-    return $today-60*60*24*$1;
+    return time-60*60*24*$1;
   }
   elsif ($time =~ /^\s*(\d+) weeks? ago\s*$/i)
   {
-    return $today-60*60*24*7*$1;
+    return time-60*60*24*7*$1;
   }
   else
   {
-    return str2time($time);
+    # Make sure we return '' instead of undef to simulate Date::Manip's
+    # behavior.
+    my $parsedTime = str2time($time);
+    return $parsedTime || '';
   }
 }
 
 #-------------------------------------------------------------------------------
+</DATE_PARSE>
 
 # Figure out what kind of date restriction they want, and what the dates in
 # question are.
@@ -759,7 +959,12 @@ elsif ($datestring =~ /^between (.*) and (.*)/i)
   cleanExit "\"$2\" is not a valid date" if (!$date2);
 
   # Swap the dates if the user gave them backwards.
+<DATE_PARSE>
   if ($date1 > $date2)
+</DATE_PARSE>
+<DATE_MANIP>
+  if ($date1 gt $date2)
+</DATE_MANIP>
   {
     my $temp;
     $temp = $date1;
@@ -801,7 +1006,12 @@ else
 {
   if ($dateRestriction eq "before")
   {
+<DATE_PARSE>
     if ($emailDate < $date1)
+</DATE_PARSE>
+<DATE_MANIP>
+    if ($emailDate lt $date1)
+</DATE_MANIP>
     {
       return 1;
     }
@@ -812,7 +1022,12 @@ else
   }
   elsif ($dateRestriction eq "after")
   {
+<DATE_PARSE>
     if ($emailDate > $date1)
+</DATE_PARSE>
+<DATE_MANIP>
+    if ($emailDate gt $date1)
+</DATE_MANIP>
     {
       return 1;
     }
@@ -823,7 +1038,14 @@ else
   }
   elsif ($dateRestriction eq "on")
   {
-    if ($emailDate == $date1)
+<DATE_PARSE>
+    # Since these values are in seconds, we have to make sure that $emailDate
+    # is within 24 hours after $date1
+    if (($emailDate > $date1) && ($emailDate-$date1 < 24*60*60))
+</DATE_PARSE>
+<DATE_MANIP>
+    if (&UnixDate($emailDate,"%m %d %Y") eq &UnixDate($date1,"%m %d %Y"))
+</DATE_MANIP>
     {
       return 1;
     }
@@ -834,7 +1056,12 @@ else
   }
   elsif ($dateRestriction eq "between")
   {
+<DATE_PARSE>
     if (($emailDate > $date1) && ($emailDate < $date2))
+</DATE_PARSE>
+<DATE_MANIP>
+    if (($emailDate gt $date1) && ($emailDate lt $date2))
+</DATE_MANIP>
     {
       return 1;
     }
@@ -846,6 +1073,49 @@ else
 }
 
 }
+</DATES>
+
+#-------------------------------------------------------------------------------
+
+sub usage
+{
+<<EOF;
+usage: grepmail [-bDhilmrv] [[-e] <expr>]<DATES> [-d "datespec"]</DATES> <files...>
+
+-b Search must match body
+<DATES>
+-d Specify a date range (see below)
+</DATES>
+-D Debug mode
+-e Explicitely name expr (when searching for strings beginning with "-")
+-h Search must match header
+-i Ignore case in the search expression
+-l Output the names of files having an email matching the expression
+-M Do not search non-text mime attachments
+-m Append "X-Mailfolder: <folder>" to all headers to indicate in which folder
+   the match occurred
+-q Quiet mode -- don't output warnings
+-r Output the names of the files and the number of emails matching the
+   expression
+-v Output emails that don't match the expression
+
+<DATES>
+Date specifications must be of the form of:
+a date like "today", <DATE_MANIP>"1st thursday in June 1992", </DATE_MANIP>"05/18/93",
+  "12:30 Dec 12th 1880", "8:00pm december tenth",
+OR "before", "after", or "since", followed by a date as defined above,
+OR "between <date> and <date>", where <date> is defined as above.
+
+</DATES>
+<COMPRESSION>
+Files can be plain ASCII or ASCII files compressed with <GZIP>gzip</GZIP><TZIP><GZIP>, </GZIP><GZIP && !BZIP>or </GZIP && !BZIP>tzip</TZIP><BZIP><GZIP || TZIP>, or </GZIP || TZIP>bzip2</BZIP>.
+You can also pipe normal or compressed ASCII to grepmail.
+</COMPRESSION>
+<!COMPRESSION>
+You can also pipe ASCII to grepmail.
+</!COMPRESSION>
+EOF
+}
 
 #-------------------------------------------------------------------------------
 
@@ -855,7 +1125,7 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [-vihblrm] [-e <regex>] [-d "datespec"] [mailbox ...]
+  grepmail [-vihblrm] [-e <regex>]<DATES> [-d "datespec"] </DATES>[mailbox ...]
 
 =head1 DESCRIPTION
 
@@ -870,9 +1140,11 @@ When redirected to a file, the result is another mailbox, which can, in turn,
 be handled by standard User Agents, such as I<elm>, or even used as input for
 another instance of I<grepmail>.
 
+<DATES>
 The pattern is optional if -d is used, and must precede the -d flag unless it
 is specified using -e.
 
+</DATES>
 =back
 
 =head1 OPTIONS AND ARGUMENTS
@@ -890,12 +1162,12 @@ globbing (shell expansion). To search for more than one pattern, use the form
 
 =item B<mailbox>
 
-Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.  The
-mailboxes may be compressed by gzip, bzip2, or tzip, in which case gunzip,
-bzip2, or tzip must be installed on the system.
+Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.<COMPRESSION>  The
+mailboxes may be compressed by <GZIP>gzip</GZIP><TZIP><GZIP>, </GZIP><GZIP && !BZIP>or </GZIP && !BZIP>tzip</TZIP><BZIP><GZIP || TZIP>, or </GZIP || TZIP>bzip2</BZIP>, in which case
+<GZIP>gunzip</GZIP><TZIP><GZIP>, </GZIP><GZIP && !BZIP>or </GZIP && !BZIP>tzip</TZIP><BZIP><GZIP || TZIP>, or </GZIP || TZIP>bzip2</BZIP> must be installed on the system.</COMPRESSION>
 
-If no mailbox is specified, takes input from stdin, which can be compressed or
-not. grepmail's behavior is undefined when ASCII and binary data is piped
+If no mailbox is specified, takes input from stdin<COMPRESSION>, which can be compressed or
+not.</COMPRESSION> grepmail's behavior is undefined when ASCII and binary data is piped
 together as input.
 
 =item B<-b>
@@ -905,6 +1177,7 @@ Asserts that the pattern must match in the body of the email.
 =item B<-D>
 
 Enable debug mode, which prints diagnostic messages.
+<DATES>
 
 =item B<-d>
 
@@ -912,6 +1185,7 @@ Date specifications must be of the form of:
   - a date like "today", "yesterday", "5/18/93", "5 days ago", "5 weeks ago",
   - OR "before", "after", or "since", followed by a date as defined above,
   - OR "between <date> and <date>", where <date> is defined as above.
+</DATES>
 
 =item B<-e>
 
@@ -931,10 +1205,20 @@ Make the search case-insensitive (by analogy to I<grep -i>).
 Output the names of files having an email matching the expression, (by analogy
 to I<grep -l>).
 
+=item B<-M>
+
+Causes grepmail to ignore non-text MIME attachments. This removes false
+positives resulting from binaries encoded as ASCII attachments.
+
 =item B<-m>
 
 Append "X-Mailfolder: <folder>" to all email headers, indicating which folder
 contained the matched email.
+
+=item B<-q>
+
+Quiet mode. Suppress the output of warning messages about non-mailbox files,
+directories, etc.
 
 =item B<-r>
 
@@ -950,11 +1234,19 @@ being the complement of those that would be printed without the -v switch.
 =back
 
 =head1 EXAMPLES
+<DATES>
 
 Get all email that you mailed yesterday
 
   grepmail -d yesterday sent-mail
 
+<DATE_MANIP>
+Get all email that you mailed before the first thursday in June 1998 that
+pertains to research:
+
+  grepmail research -d "before 1st thursday in June 1992" sent-mail
+
+</DATE_MANIP>
 Get all email that you mailed before the first of June 1998 that
 pertains to research:
 
@@ -964,6 +1256,7 @@ Get all email you received since 8/20/98 that wasn't about research or your
 job, ignoring case:
 
   grepmail -iv "(research|job)" -d "since 8/20/98" saved-mail
+</DATES>
 
 Get all email about mime but not about Netscape. Constrain the search to match
 the body, since most headers contain the text "mime":
@@ -984,6 +1277,7 @@ mailboxes:
 
   grepmail -br grepmail saved-mail*
 
+<COMPRESSION>
 =head1 FILES
 
 grepmail will I<not> create temporary files while decompressing compressed
@@ -991,6 +1285,7 @@ archives. The last version to do this was 3.5. While the new design uses
 more memory, the code is much simpler, and there is less chance that email
 can be read by malicious third parties. Memory usage is determined by the size
 of the largest email message in the mailbox.
+</COMPRESSION>
 
 =head1 AUTHOR
 
