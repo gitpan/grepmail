@@ -8,7 +8,7 @@ use vars qw($running_under_some_shell);         # no whining!
 
 require 5.003;
 
-# grepmail version 2.0
+# grepmail version 2.0.1
 
 # Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 # and returns those emails that match it. Piped input is allowed, and date
@@ -48,7 +48,6 @@ require 5.003;
 use strict;
 use FileHandle;
 use Getopt::Std;
-use Mail::Internet;
 use Carp;
 
 my (%opts, $pattern, $unzipMethod);
