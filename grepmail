@@ -1,6 +1,6 @@
-#!/usr/cs/contrib/bin/perl -w
+#!/usr/bin/perl -w
 
-# grepmail version 1.8
+# grepmail version 1.9
 
 # Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 # and returns those emails that match it. Piped input is allowed, and date
@@ -15,6 +15,9 @@
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 1.9 "Ignore empty files" by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>.
+#   Emails without dates are now automatically output no matter what the
+#   date specification is. (Better safe than sorry!)
 # 1.7 Sped up by Andrew Johnson. It no longer looks for dates unless
 #   the email matches the search string.
 # 1.6 removed use of Compress::Zlib because it was 30% slower, complicated the
@@ -100,6 +103,9 @@ if (@ARGV)
   my $file;
   foreach $file (@ARGV)
   {
+    # First of all, ignore empty files.
+    next if -z $file;
+
     # If it's not a gzipped file
     if ($file !~ /\.(gz|Z)$/)
     {
