@@ -1,16 +1,16 @@
-grepmail 4.91
+grepmail 5.00
 
 usage:
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-j status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     <files...>
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-j status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [[-e] <pattern>] <files...>
 
-  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s sizespec]
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-j status] [-s sizespec]
     [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
     [-E <expr>] <files...>
 
@@ -27,11 +27,11 @@ compressed ASCII input is taken from STDIN.
 -D Debug mode
 -e Explicitly name pattern (when searching for strings beginning with "-")
 -E Specify a complex search expression
--f Search must match status (A=answered, R=read, D=deleted, O=old, F=flagged)
 -F Force processing of mailboxes which appear to be binary
 -h Search must match header
 -H Print headers but not bodies of matching emails
 -i Ignore case in the search expression
+-j Search must match status (A=answered, R=read, D=deleted, O=old, F=flagged)
 -l Output the names of files having an email matching the expression
 -M Do not search non-text mime attachments
 -m Append "X-Mailfolder: <folder>" to all headers to indicate in which folder

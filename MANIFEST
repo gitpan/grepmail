@@ -6,6 +6,7 @@ CHANGES                               A change history
 LICENSE                               A copy of the license
 Makefile.PL                           Makes the makefile
 t/functionality.t                     A test of the script's correctness
+t/patterns                            Some input patterns for testing
 t/gnus.txt                            Input file
 t/mailseparators.txt                  Input file
 t/mailarc-1.txt                       Input file
@@ -246,3 +247,5 @@ t/results/test114.stdout.real          Correct STDOUT output file
 t/results/test114.stderr.real          Correct STDERR output file
 t/results/test115.stdout.real          Correct STDOUT output file
 t/results/test115.stderr.real          Correct STDERR output file
+t/results/test116.stdout.real          Correct STDOUT output file
+t/results/test116.stderr.real          Correct STDERR output file

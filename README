@@ -5,14 +5,37 @@ regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported, as are searches using
 logical operators.
 
-New in version 4.91:
-- Added missing dependency for Storable.
-- Storable now only necessary if you plan on using caching
-- Fixed a bug in test case 83
-- Changed -s to support "<", ">", "<=", ">=" and "-"
+New in version 5.00:
+- grepmail is now orders of magnitude faster for mailboxes which have very
+  large (>30MB) emails in them
+- "grep" is now used to find the start of emails, if it is installed. For
+  mailboxes with large emails in them, this can speed things up by about 5x.
+- Reduced memory consumption by about 3 times.
+- -- now marks the end of options and the beginning of folders
+- -f now reads patterns from a file like GNU grep does.
+- Added smail compatibility.
+- Date specifications without times (e.g. "today") are interpreted as midnight
+  of the given day instead of the current time of that day.
+- Fixed -i when used with -Y -- it was always case sensitive before.
+- Updated t/functionality.t to avoid running gzip-related test cases when gzip
+  is not installed on the system.
+- Improved some error messages so that they prepend "grepmail: " as they
+  should
+- The "**" prefix on warnings has been changed to "grepmail:"
+- Cleaned up some warnings about ambiguous hash values
+- Added a warning about the version of perl required for new pattern features
+- -t flag renamed to -j
+- Fixed broken Gnus support
+- Improved test case for Gnus
 
 
 SOME NOTES
+
+perl version:
+
+If you plan to use advanced pattern features such as "(?>...)", you will need
+to make sure that your version of perl supports them.
+
 
 -s flag:
 
@@ -176,6 +199,14 @@ HOMEPAGE
 
 Visit http://grepmail.sourceforge.net/ for the latest version, mailing lists,
 discussion forums, CVS access, cool utilities, and more.
+
+
+TODO/WISHLIST
+
+- Michael D. Schleif <mds@helices.org> suggested grepmail have support for
+  compressed mail directories. Adding support for this is not easy, and I'm
+  not sure many people would benefit from the feature. Let me know if you too
+  want this support, and I may implement it.
 
 
 REPORTING BUGS

@@ -1,3 +1,37 @@
+Features which haven't made it in yet:
+- Support for searches on email threads. (Thanks to Zack Brown
+  <zbrown@tumblerings.org> for the excellent feature idea and a prototype
+  implementation.)
+
+New in version 5.00:
+- grepmail is now orders of magnitude faster for mailboxes which have very
+  large (>30MB) emails in them
+- "grep" is now used to find the start of emails, if it is installed. For
+  mailboxes with large emails in them, this can speed things up by about 5x.
+- Reduced memory consumption by about 3 times.
+- -- now marks the end of options and the beginning of folders (Thanks to
+  Reuben Thomas <rrt@sc3d.org> for the idea.)
+- -f now reads patterns from a file like GNU grep does. (Feature suggestion by
+  Darxus@chaosreigns.com)
+- Added smail compatibility. (Thanks to Roy <qroy@ghg.net> for the patch.)
+- The "**" prefix on warnings has been changed to "grepmail:"
+- Date specifications without times (e.g. "today") are interpreted as midnight
+  of the given day instead of the current time of that day. (Bugfix and
+  initial patch by Reuben Thomas <rrt@sc3d.org>.)
+- Fixed -i when used with -Y--it was always case sensitive. (Bugfix by Michael
+  C. Toren <mct@toren.net>)
+- Updated t/functionality.t to avoid running gzip-related test cases when gzip
+  is not installed on the system.
+- Improved some error messages so that they prepend "grepmail: " as they
+  should
+- Cleaned up some warnings about ambiguous hash values (Thanks to Philip
+  Douglass <philipsd@sf.net> for pointing them out in a bug report.)
+- Added a warning about the version of perl required for new pattern features
+  (Thanks to Philip Douglass <philipsd@sf.net> for the bug report.)
+- -t flag is now -j
+- Fixed broken Gnus support
+- Improved test case for Gnus
+
 New in version 4.91:
 - Added missing dependency for Storable.
 - Storable now only necessary if you plan on using caching
