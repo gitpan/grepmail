@@ -1,26 +1,21 @@
-# use perl                                  -*- mode: Perl; -*-
-eval 'exec perl -S $0 "$@"'
-  if $running_under_some_shell;
-
-use vars qw($running_under_some_shell);         # no whining!
+#!/usr/bin/perl -w
 
 # grepmail
 
-$VERSION = 3.9;
+$VERSION = 4.11;
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
 # supports piped compressed or ascii input, and searches constrained by date. 
 
 # If you would like to be notified of updates, send email to me at
-# coppit@cs.virginia.edu. The latest version is always at
+# david@coppit.org. The latest version is always at
 # http://www.cs.virginia.edu/~dwc3q/code/.
 
 # Do a pod2text on this file to get full documentation, or pod2man to get
 # man pages.
 
-# Written by David Coppit (coppit@cs.virginia.edu,
-#  http://www.cs.virginia.edu/~dwc3q/index.html)
+# Written by David Coppit (david@coppit.org, http://coppit.org/)
 
 # Please send me any modifications you make. (for the better, that is. :) I
 # have a suite of tests that I can give you if you ask. Keep in mind that I'm
@@ -46,9 +41,11 @@ $VERSION = 3.9;
 #  trying to figure out whether the header uniquely determines whether the
 #  email matches.)
 
-use Getopt::Std;
+require 5.00396;
 
 use vars qw(%opts $pattern $commandLine $VERSION);
+
+use Getopt::Std;
 
 # We need to do this early to check for the -D flag when setting the DEBUG
 # constant
@@ -69,8 +66,6 @@ BEGIN
 }
 
 use constant DEBUG => $opts{'D'} || 0;
-
-require 5.00396;
 
 use strict;
 use FileHandle;
@@ -98,7 +93,7 @@ sub cleanExit
   $message = shift || "Cancelled";
   print STDERR "grepmail: $message.\n";
 
-  exit;
+  exit 1;
 }
 
 #-------------------------------------------------------------------------------
@@ -239,6 +234,7 @@ foreach my $arg (@args)
     import File::Find;
 
     # Gets all plain files in directory and descendents. Puts them in @files
+    $File::Find::name = '';
     find(sub {push @files,"$File::Find::name" if -f $_}, $arg);
   }
   else
@@ -277,7 +273,7 @@ local $/ = "\n\n";
 my $buffer = <$fileHandle>;
 
 my $returnVal;
-if ($buffer =~ /^From: /im && $buffer =~ /^Date: /im)
+if ($buffer =~ /^From /im && $buffer =~ /^Date: /im)
 {
   $returnVal = 1;
 }
@@ -330,21 +326,21 @@ sub HandleInputFiles
     elsif ($file =~ /\.tz$/)
     {
       dprint "Calling tzip to decompress file.";
-      $fileHandle->open("tzip -cd $file|") 
+      $fileHandle->open("tzip -cd '$file'|") 
         or cleanExit "Can't execute tzip for file $file";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
       dprint "Calling gunzip to decompress file.";
-      $fileHandle->open("gunzip -c $file|")
+      $fileHandle->open("gunzip -c '$file'|")
         or cleanExit "Can't execute gunzip for file $file";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
       dprint "Calling bzip2 to decompress file.";
-      $fileHandle->open("bzip2 -dc $file|")
+      $fileHandle->open("bzip2 -dc '$file'|")
         or cleanExit "Can't execute bzip2 for file $file";
     }
 
@@ -487,8 +483,18 @@ while (!eof($fileHandle))
   {
     dprint '-'x70;
     dprint "Processing email:";
-    $header_buffer =~ /^(From:.*)$/im;
-    dprint "  $1";
+
+    if ($header_buffer =~ /^From:/)
+    {
+      $header_buffer =~ /^(From:.*)$/im;
+      dprint "  $1";
+    }
+    else
+    {
+      $header_buffer =~ /^(From.*)$/im;
+      dprint "  $1";
+    }
+
     $header_buffer =~ /^(Subject:.*)$/im;
     dprint "  $1";
   }
@@ -935,6 +941,8 @@ else
 sub usage
 {
 <<EOF;
+grepmail $VERSION
+
 usage: grepmail [-bDhilmrRv] [[-e] <expr>] [-d "datespec"] <files...>
 
 -b Search must match body
@@ -987,8 +995,8 @@ When redirected to a file, the result is another mailbox, which can, in turn,
 be handled by standard User Agents, such as I<elm>, or even used as input for
 another instance of I<grepmail>.
 
-The pattern is optional if -d is used, and must precede the -d flag unless it
-is specified using -e.
+The pattern is optional if B<-d> is used, and must precede the B<-d> flag
+unless it is specified using B<-e>.
 
 =back
 
@@ -1075,8 +1083,9 @@ Causes grepmail to recurse any directories encountered.
 =item B<-v>
 
 Invert the sense of the search, (by analogy to I<grep -v>). Note that this
-affects only -h and -b, not -d. This results in the set of emails printed
-being the complement of those that would be printed without the -v switch.
+affects only B<-h> and B<-b>, not B<-d>. This results in the set of emails
+printed being the complement of those that would be printed without the B<-v>
+switch.
 
 =back
 

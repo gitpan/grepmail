@@ -4,33 +4,16 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date restrictions are supported.
 
-New in version 3.9:
-- Took out specialization engine because there wasn't enough support to
-  program in that style.
-- Offering 2 main versions now -- Date::Manip and Date::Parse
-- Added -R option, which causes grepmail to recurse any directories
-  encountered. (Thanks to Emil Tiller <etiller@asc.corp.mot.com> for the
-  initial code.)
-- Fixed a small bug that would cause some attachments not to be identified.
+New in version 4.11:
+- Fixed a bug where an ASCII file would not be recognized as a mailbox when
+  the first couple emails did not have a "From:" line. (Thanks to Jeff Flowers
+  <jeff.flowers@npl.co.uk>)
+- Added standard Perl testing.
 
-New in version 3.8:
-- Added a prototype engine to allow users to specialize grepmail at
-  installation time. (See below)
-- Fixed buggy mailbox detection algorithm
-- Fixed bug in identification of email headers.
-- Fixed bug in parsing timezones of emails. (Thanks to Wolfgang Weisselberg
-  <weisselberg@element5.de>)
-- Fixed bug in handling of date specifications like "2 days ago" and "2 weeks
-  ago"
-- Added -M switch, which causes grepmail to ignore non-text attachments.
-- Added "quiet mode", -q switch, which supresses warnings about directories,
-  non-mailbox ASCII files, binary files that can't be decompressed, etc.
-- Restructured code a bit. Moved file and STDIN processing out of main. The
-  whole email is now read before the match is made to the body, instead of
-  trying to match the pattern while reading the body. (This simplifies the
-  algorithms and makes -M support a lot easier, at the cost of increasing the
-  required memory slightly.) Now uses ungetc to put the test characters used
-  during file type detection back on the stream.
+New in version 4.1:
+- Stripped auto-perl execution code, since it never works on all platforms.
+  (Installation instructions modified to require the user to fix the #! line.)
+- Minor changes to allow grepmail to run without -w complaints.
 
 See the file CHANGES for a complete change history.
 
@@ -43,21 +26,26 @@ Two versions of grepmail are included in this distribution:
   better error checking than Date::Parse, but which causes grepmail to run
   about 60% slower. Date::Manip understands leap years and support date
   specifications like "2nd Thursday in July".
+
+On Non-Windows systems:
+  % perl Makefile.PL
+  % make
+  % make test
+  % make install
+
+On Windows systems:
 - Just pick which one you like, and rename it to "grepmail"
+- Do "perldoc grepmail" for documentation
 
-
-Please send any questions or suggestions you have.
 
 AUTHOR
 
 Written by David Coppit (david@coppit.org, http://coppit.org/)
 
-Send me email if you would like to be notified of updates.
-
-Please send me any modifications you make. (for the better, that is. :) I have
-a suite of tests that I can give you if you ask. Keep in mind that I'm likely
-to turn down obscure features to avoid including everything but the kitchen
-sink.
+Please send any enhancements, questions, or suggestions you have.  Also send
+me email if you would like to be notified of updates.  I have a suite of tests
+that I can give you if you ask. Keep in mind that I'm likely to turn down
+obscure features to avoid including everything but the kitchen sink.
 
 
 LICENSE

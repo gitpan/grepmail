@@ -1,3 +1,20 @@
+New in version 4.11:
+- Fixed a bug where an ASCII file would not be recognized as a mailbox when
+  the first couple emails did not have a "From:" line. (Thanks to Jeff Flowers
+  <jeff.flowers@npl.co.uk>)
+- Added standard Perl testing.
+
+New in version 4.1:
+- Stripped auto-perl execution code, since it never works on all platforms.
+  (Installation instructions modified to require the user to fix the #! line.)
+- Minor changes to allow grepmail to run without -w complaints.
+
+New in version 4.0:
+- Fixed a bug where shell characters needed to be escaped for compressed
+  files. (Bug found by Richard Clamp <richardc@tw2.com>
+- Added #!/bin/sh as first line to make the rest compatible with csh/tcsh
+  users. (Bug found by Ed Arnold <era@ucar.edu>)
+
 New in version 3.9:
 - Took out specialization engine because there wasn't enough support to
   program in that style.

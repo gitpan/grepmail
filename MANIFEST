@@ -1,0 +1,44 @@
+grepmail.DM                           grepmail using Date::Manip. (Slower but
+                                        more functional)
+grepmail.DP                           grepmail using Date::Manip. (Faster but
+                                        less functional)
+README                                Read this first
+MANIFEST                              This file
+CHANGES                               A change history
+Makefile.PL                           Makes the makefile
+t/functionality.t                     A test of the script's correctness
+t/mailarc-1.txt                       Input file
+t/mailarc-2.txt                       Input file
+t/mailarc-2.txt.gz                    Input file
+t/mailarc-2.txt.tz                    Input file
+t/mailarc-2.txt.bz2                   Input file
+t/results/test1.real                  Correct output file
+t/results/test2.real                  Correct output file
+t/results/test3.real                  Correct output file
+t/results/test4.real                  Correct output file
+t/results/test5.real                  Correct output file
+t/results/test6.real                  Correct output file
+t/results/test7.real                  Correct output file
+t/results/test8.real                  Correct output file
+t/results/test9.real                  Correct output file
+t/results/test10.real                 Correct output file
+t/results/test11.real                 Correct output file
+t/results/test12.real                 Correct output file
+t/results/test13.real                 Correct output file
+t/results/test14.real                 Correct output file
+t/results/test15.real                 Correct output file
+t/results/test16.real                 Correct output file
+t/results/test17.real                 Correct output file
+t/results/test18.real                 Correct output file
+t/results/test19.real                 Correct output file
+t/results/test20.real                 Correct output file
+t/results/test21.real                 Correct output file
+t/results/test22.real                 Correct output file
+t/results/test23.real                 Correct output file
+t/results/test24.real                 Correct output file
+t/results/test25.real                 Correct output file
+t/results/test26.real                 Correct output file
+t/results/test27.real                 Correct output file
+t/results/test28.real                 Correct output file
+t/results/test29.real                 Correct output file
+t/results/test30.real                 Correct output file
