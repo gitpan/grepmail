@@ -1,3 +1,23 @@
+New in version 4.42:
+- Added -a flag to use received date instead of sent date for -d matches.
+  (Thanks to Michael Liljeblad <liljeblad at users.sourceforge.net> for the
+  patch.)
+- Included emails are now ignored properly (Thanks to an anonymous submittor 
+  for the bug report and part of a patch
+  https://sourceforge.net/bugs/?func=detailbug&bug_id=112159&group_id=2207)
+- If an email has no date, the -d switch now issues a warning and does not
+  treat the email as a match (Thanks to David Blaine <blained at
+  users.sourceforge.net> for the bug report.)
+- -d "" can be used to find emails without dates
+- Mailbox files are now detected as files using if ($buffer =~
+  /^(X-From-Line:|From) /im && $buffer =~ /^Subject: /im) rather than if
+  ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Date: /im)
+- Improved detection of binary files
+- STDERR and STDOUT now checked separately during "make test"
+- Headers can now be in the format "Date:<tab>" in addition to "Date: "
+  (Thanks to Benjamin Korvemaker <korvemaker at users.sourceforge.net> for the
+  patch and concept.)
+
 New in version 4.41:
 - Support for Gnus-style mail files added (Thanks to Werner Bosse
   <Werner.Bosse@alcatel.de> for the patch.)

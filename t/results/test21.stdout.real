@@ -110,7 +110,6 @@ Received: from ml.media.mit.edu (ml.media.mit.edu [18.85.13.107])
 Received: (from fredm@localhost)
 	by ml.media.mit.edu (8.8.7/8.8.7) id JAA32741
 	for handyboard; Thu, 1 Jan 1998 09:41:01 -0500 (EST)
-Date: Thu, 1 Jan 1998 09:41:01 -0500 (EST)
 From: Fred G Martin <fredm@media.mit.edu>
 Message-Id: <199801011441.JAA32741@ml.media.mit.edu>
 To: handyboard@media.mit.edu

@@ -1466,7 +1466,7 @@ someone@imagecraft.com http://www.imagecraft.com
 
 From brian-c@technologist.com  Mon Jul  6 17:54:19 1998
 Received: from aleve.media.mit.edu by hub.media.mit.edu; (5.65v3.2/1.1/06Jun95-8.2MPM)
-	id AA03667; Mon, 6 Jul 1998 17:54:19 -0400
+	id AA03667; Mon, 16 Jul 1998 17:54:19 -0400
 Received: from web04.globecomm.net (web04.globecomm.net [207.51.48.104])
 	by aleve.media.mit.edu (8.8.7/ML970927) with ESMTP id TAA30534
 	for <handyboard@media.mit.edu>; Mon, 6 Jul 1998 19:24:28 -0400 (EDT)

@@ -9,37 +9,77 @@ t/mailarc-2.txt                       Input file
 t/mailarc-2.txt.gz                    Input file
 t/mailarc-2.txt.tz                    Input file
 t/mailarc-2.txt.bz2                   Input file
-t/results/test1.real                  Correct output file
-t/results/test2.real                  Correct output file
-t/results/test3.real                  Correct output file
-t/results/test4.real                  Correct output file
-t/results/test5.real                  Correct output file
-t/results/test6.real                  Correct output file
-t/results/test7.real                  Correct output file
-t/results/test8.real                  Correct output file
-t/results/test9.real                  Correct output file
-t/results/test10.real                 Correct output file
-t/results/test11.real                 Correct output file
-t/results/test12.real                 Correct output file
-t/results/test13.real                 Correct output file
-t/results/test14.real                 Correct output file
-t/results/test15.real                 Correct output file
-t/results/test16.real                 Correct output file
-t/results/test17.real                 Correct output file
-t/results/test18.real                 Correct output file
-t/results/test19.real                 Correct output file
-t/results/test20.real                 Correct output file
-t/results/test21.real                 Correct output file
-t/results/test22.real                 Correct output file
-t/results/test23.real                 Correct output file
-t/results/test24.real                 Correct output file
-t/results/test25.real                 Correct output file
-t/results/test26.real                 Correct output file
-t/results/test27.real                 Correct output file
-t/results/test28.real                 Correct output file
-t/results/test29.real                 Correct output file
-t/results/test30.real                 Correct output file
-t/results/test31.real                 Correct output file
-t/results/test32.real                 Correct output file
-t/results/test33.real                 Correct output file
-t/results/test34.real                 Correct output file
+t/results/test1.stdout.real           Correct STDOUT output file
+t/results/test1.stderr.real           Correct STDERR output file
+t/results/test2.stdout.real           Correct STDOUT output file
+t/results/test2.stderr.real           Correct STDERR output file
+t/results/test3.stdout.real           Correct STDOUT output file
+t/results/test3.stderr.real           Correct STDERR output file
+t/results/test4.stdout.real           Correct STDOUT output file
+t/results/test4.stderr.real           Correct STDERR output file
+t/results/test5.stdout.real           Correct STDOUT output file
+t/results/test5.stderr.real           Correct STDERR output file
+t/results/test6.stdout.real           Correct STDOUT output file
+t/results/test6.stderr.real           Correct STDERR output file
+t/results/test7.stdout.real           Correct STDOUT output file
+t/results/test7.stderr.real           Correct STDERR output file
+t/results/test8.stdout.real           Correct STDOUT output file
+t/results/test8.stderr.real           Correct STDERR output file
+t/results/test9.stdout.real           Correct STDOUT output file
+t/results/test9.stderr.real           Correct STDERR output file
+t/results/test10.stdout.real          Correct STDOUT output file
+t/results/test10.stderr.real          Correct STDERR output file
+t/results/test11.stdout.real          Correct STDOUT output file
+t/results/test11.stderr.real          Correct STDERR output file
+t/results/test12.stdout.real          Correct STDOUT output file
+t/results/test12.stderr.real          Correct STDERR output file
+t/results/test13.stdout.real          Correct STDOUT output file
+t/results/test13.stderr.real          Correct STDERR output file
+t/results/test14.stdout.real          Correct STDOUT output file
+t/results/test14.stderr.real          Correct STDERR output file
+t/results/test15.stdout.real          Correct STDOUT output file
+t/results/test15.stderr.real          Correct STDERR output file
+t/results/test16.stdout.real          Correct STDOUT output file
+t/results/test16.stderr.real          Correct STDERR output file
+t/results/test17.stdout.real          Correct STDOUT output file
+t/results/test17.stderr.real          Correct STDERR output file
+t/results/test18.stdout.real          Correct STDOUT output file
+t/results/test18.stderr.real          Correct STDERR output file
+t/results/test19.stdout.real          Correct STDOUT output file
+t/results/test19.stderr.real          Correct STDERR output file
+t/results/test20.stdout.real          Correct STDOUT output file
+t/results/test20.stderr.real          Correct STDERR output file
+t/results/test21.stdout.real          Correct STDOUT output file
+t/results/test21.stderr.real          Correct STDERR output file
+t/results/test22.stdout.real          Correct STDOUT output file
+t/results/test22.stderr.real          Correct STDERR output file
+t/results/test23.stdout.real          Correct STDOUT output file
+t/results/test23.stderr.real          Correct STDERR output file
+t/results/test24.stdout.real          Correct STDOUT output file
+t/results/test24.stderr.real          Correct STDERR output file
+t/results/test25.stdout.real          Correct STDOUT output file
+t/results/test25.stderr.real          Correct STDERR output file
+t/results/test26.stdout.real          Correct STDOUT output file
+t/results/test26.stderr.real          Correct STDERR output file
+t/results/test27.stdout.real          Correct STDOUT output file
+t/results/test27.stderr.real          Correct STDERR output file
+t/results/test28.stdout.real          Correct STDOUT output file
+t/results/test28.stderr.real          Correct STDERR output file
+t/results/test29.stdout.real          Correct STDOUT output file
+t/results/test29.stderr.real          Correct STDERR output file
+t/results/test30.stdout.real          Correct STDOUT output file
+t/results/test30.stderr.real          Correct STDERR output file
+t/results/test31.stdout.real          Correct STDOUT output file
+t/results/test31.stderr.real          Correct STDERR output file
+t/results/test32.stdout.real          Correct STDOUT output file
+t/results/test32.stderr.real          Correct STDERR output file
+t/results/test33.stdout.real          Correct STDOUT output file
+t/results/test33.stderr.real          Correct STDERR output file
+t/results/test34.stdout.real          Correct STDOUT output file
+t/results/test34.stderr.real          Correct STDERR output file
+t/results/test35.stdout.real          Correct STDOUT output file
+t/results/test35.stderr.real          Correct STDERR output file
+t/results/test36.stdout.real          Correct STDOUT output file
+t/results/test36.stderr.real          Correct STDERR output file
+t/results/test37.stdout.real          Correct STDOUT output file
+t/results/test37.stderr.real          Correct STDERR output file

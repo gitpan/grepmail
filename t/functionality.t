@@ -49,6 +49,9 @@ my @tests = (
 'grepmail -u t/mailarc-1.txt',
 'grepmail -bi imagecraft -u t/mailarc-1.txt',
 'grepmail -d "before 1st Tuesday in July 1998" t/mailarc-1.txt',
+'grepmail -d "before 7/15/1998" t/mailarc-2.txt',
+'grepmail -d "" t/mailarc-2.txt',
+'grepmail -ad "before 7/15/1998" t/mailarc-1.txt',
 );
 
 # Tests for certain supported options.
@@ -73,7 +76,7 @@ my $date_manip = 0;
   # compression programs
   use vars qw(*OLDSTDERR);
   open OLDSTDERR,">&STDERR" or die "Can't save STDOUT: $!\n";
-  open STDERR,">/dev/null" or die "Can't redirect STDOUT to /dev/null: $!\n";
+  open STDERR,">/dev/null" or die "Can't redirect STDERR to /dev/null: $!\n";
 
   $temp = `bzip2 -h 2>&1`;
   $bzip2 = 1 if $temp =~ /usage/;
@@ -84,7 +87,7 @@ my $date_manip = 0;
   $temp = `tzip -h 2>&1`;
   $tzip = 1 if $temp =~ /usage/;
 
-  open STDERR,">&OLDSTDERR" or die "Can't restore STDOUT: $!\n";
+  open STDERR,">&OLDSTDERR" or die "Can't restore STDERR: $!\n";
 
   if (ModuleInstalled("Date::Manip"))
   {
@@ -110,7 +113,8 @@ foreach my $test (@tests)
 
   next if CheckSkip($testNumber);
 
-  system "$test > t/results/test$testNumber.out 2>&1";
+  system "$test 1>t/results/test$testNumber.stdout " .
+    "2>t/results/test$testNumber.stderr";
 
   if ($? && (!grep {$_ == $testNumber} @error_cases))
   {
@@ -119,39 +123,7 @@ foreach my $test (@tests)
     next;
   }
 
-  my $diffstring = "diff t/results/test$testNumber.out t/results/test$testNumber.real";
-  system "$diffstring > t/results/test$testNumber.diff";
-
-  if ($? == 2)
-  {
-    print "Couldn't do diff.\n";
-
-    ok(0);
-
-    next;
-  }
-
-  my $numdiffs = `cat t/results/test$testNumber.diff | wc -l`;
-  $numdiffs =~ s/[\n ]//g;
-  $numdiffs = $numdiffs/2;
-
-  if ($numdiffs != 0)
-  {
-    print "Failed, with $numdiffs differences.\n";
-    print "  See t/results/test$testNumber.out and t/results/test$testNumber.diff.\n";
-    ok(0);
-
-    next;
-  }
-
-  if ($numdiffs == 0)
-  {
-    print "Succeeded.\n";
-    ok(1);
-
-#    unlink "t/results/test$testNumber.out";
-    unlink "t/results/test$testNumber.diff";
-  }
+  CheckDiffs($testNumber);
 }
 continue
 {
@@ -208,6 +180,8 @@ sub CheckSkip
   return 0;
 }
 
+# ---------------------------------------------------------------------------
+
 sub ModuleInstalled
 {
   my $module_name = shift;
@@ -221,4 +195,73 @@ sub ModuleInstalled
   }
 
   return 0;
+}
+
+# ---------------------------------------------------------------------------
+
+sub CheckDiffs
+{
+  my $testNumber = shift;
+
+  my ($stdout_diff,$stdout_result) = DoDiff($testNumber,'stdout');
+  my ($stderr_diff,$stderr_result) = DoDiff($testNumber,'stderr');
+
+  ok(0), return if $stdout_diff == 0 || $stderr_diff == 0;
+  ok(0), return if $stdout_result == 0 || $stderr_result == 0;
+  ok(1), return;
+}
+
+# ---------------------------------------------------------------------------
+
+# Returns the results of the diff, and the results of the test.
+
+sub DoDiff
+{
+  my $testNumber = shift;
+  my $resultType = shift;
+
+  my $diffstring = "diff t/results/test$testNumber.$resultType " .
+    "t/results/test$testNumber.$resultType.real";
+
+  system "$diffstring > t/results/test$testNumber.$resultType.diff ".
+    "2>t/results/test$testNumber.$resultType.diff.error";
+
+  open DIFF_ERR, "t/results/test$testNumber.$resultType.diff.error";
+  my $diff_err = join '', <DIFF_ERR>;
+  close DIFF_ERR;
+
+  unlink "t/results/test$testNumber.$resultType.diff.error";
+
+  if ($? == 2)
+  {
+    print "Couldn't do diff on \U$resultType\E results.\n";
+    return (0,undef);
+  }
+
+  if ($diff_err ne '')
+  {
+    print $diff_err;
+    return (0,undef);
+  }
+
+  my $numdiffs = `cat t/results/test$testNumber.$resultType.diff | wc -l`;
+  $numdiffs =~ s/[\n ]//g;
+  $numdiffs = $numdiffs/2;
+
+  if ($numdiffs != 0)
+  {
+    print "Failed, with $numdiffs differences in \U$resultType\E.\n";
+    print "  See t/results/test$testNumber.$resultType and " .
+      "t/results/test$testNumber.$resultType.diff.\n";
+    return (1,0);
+  }
+
+  if ($numdiffs == 0)
+  {
+    print "\U$resultType\E looks good.\n";
+
+    unlink "t/results/test$testNumber.$resultType";
+    unlink "t/results/test$testNumber.$resultType.diff";
+    return (1,1);
+  }
 }
