@@ -8,13 +8,16 @@ use vars qw($running_under_some_shell);         # no whining!
 
 use constant DEBUG => 0;
 
-require 5.003;
+require 5.00396;
 
-# grepmail version 3.3
+# grepmail version 3.4
 
 # Grepmail searches a normal, gzip'd, or bzip2'd mailbox for a given regular
 # expression and returns those emails that match the query. It also supports
 # piped compressed or ascii input, and searches constrained by date. 
+
+# If you would like to be notified of updates, send email to me at
+# coppit@cs.virginia.edu
 
 # Do a pod2text on this file to get full documentation, or pod2man to get
 # man pages.
@@ -31,6 +34,8 @@ require 5.003;
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 3.4 Added tzip support (thanks to Marc Lehmann <pcg@goof.com>). Changed
+#   command line syntax again. (Last time, I hope.)
 # 3.3 Added bzip2 support (thanks to Josh Plautz <plautz@milner.com>).
 #   Improved error checking on piped binary input. Added debugging code.
 # 3.2 Added TMPFILE environment variable support, and a signal handler (thanks
@@ -91,7 +96,7 @@ use Carp;
 sub usage
 {
 <<EOF;
-usage: grepmail [[-e] <expr>] [-vihblrm] [-d \"datespec\"] <files...>
+usage: grepmail [-vihblrm] [[-e] <expr>] [-d \"datespec\"] <files...>
 
 -h Search must match header
 -b Search must match body
@@ -110,8 +115,8 @@ a date like "today", "1st thursday in June 1992", "05/10/93",
 OR "before", "after", or "since", followed by a date as defined above,
 OR "between <date> and <date>", where <date> is defined as above.
 
-Files can be ASCII or gzip'd ASCII. You can also pipe gzip'd or normal ASCII to
-grepmail.
+Files can be plain ASCII or ASCII files compressed with gzip, tzip, or bzip2.
+You can also pipe normal or compressed ASCII to grepmail.
 EOF
 }
 
@@ -160,14 +165,29 @@ BEGIN
   $pattern = "";
 
   # Print usage error if no arguments given
-  print usage and exit if ($#ARGV < 0);
+  print "No arguments given. grepmail -h for help.\n" and exit if ($#ARGV < 0);
 
-  if ($ARGV[0] !~ /^-/)
+  getopt("ed",\%opts);
+
+  # At this point, we have 3 cases:
+  # - The -d was specified without a pattern before it, in which case $opts{d}
+  #   will be set. An implicit "." is used unless -e was specified.
+  # - The pattern is in $ARGV[0], and -d is in $ARGV[1]
+  # - There is no -d in $ARGV[1], and a pattern or file is in $ARGV[0]. Take
+  #   is as a pattern if -e was not given.
+  if ($opts{d})
+  {
+    $pattern = "." if !$opts{e};
+  }
+  elsif ($#ARGV > 0 && $ARGV[1] eq "-d")
+  {
+    $pattern = shift @ARGV;
+    getopt("d",\%opts);
+  }
+  elsif (!$opts{e})
   {
     $pattern = shift @ARGV;
   }
-
-  getopt("ed",\%opts);
 
   if (DEBUG)
   {
@@ -270,30 +290,47 @@ if (@ARGV)
     my $tempFile = "$tempDir/grepmail.$$";
 
     # If it's not a compressed file
-    if ($file !~ /\.(gz|Z|bz2)$/)
+    if ($file !~ /\.(gz|Z|bz2|tz)$/)
     {
       warn "** Skipping binary file: '$file' **\n" and next if -B $file;
 
-      $fileHandle->open($file) || cleanExit "Can't open $file.";
+      $fileHandle->open($file) || cleanExit "Can't open $file";
+    }
+    # If it is a tzipped file
+    elsif ($file =~ /\.tz$/)
+    {
+      print "DEBUG: Calling tzip to decompress file.\n" if DEBUG;
+      system("tzip -cd $file > $tempFile") == 0
+        or cleanExit "Can't execute tzip for file $file";
+      # Make sure our email stays private!
+      chmod 0600, $tempFile;
+
+      $fileHandle->open($tempFile)
+        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a gzipped file
     elsif ($file =~ /\.(gz|Z)$/)
     {
       print "DEBUG: Calling gunzip to decompress file.\n" if DEBUG;
       system("gunzip -c $file > $tempFile") == 0
-        or cleanExit "Can't execute gunzip for file $file.";
+        or cleanExit "Can't execute gunzip for file $file";
+      # Make sure our email stays private!
+      chmod 0600, $tempFile;
 
       $fileHandle->open($tempFile)
-        || cleanExit "Can't open temporary file used to decompress the file $file.";
+        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
     # If it is a bzipped file
     elsif ($file =~ /\.bz2$/)
     {
       print "DEBUG: Calling bzip2 to decompress file.\n" if DEBUG;
       system("bzip2 -dc $file > $tempFile") == 0
-        or cleanExit "Can't execute bzip2 for file $file.";
+        or cleanExit "Can't execute bzip2 for file $file";
+      # Make sure our email stays private!
+      chmod 0600, $tempFile;
+
       $fileHandle->open($tempFile)
-        || cleanExit "Can't open temporary file used to decompress the file $file.";
+        || cleanExit "Can't open temporary file used to decompress the file $file";
     }
 
     ProcessMailFile($fileHandle,$file);
@@ -322,8 +359,13 @@ else
     $SIG{PIPE} = 'IGNORE';
     
     # This seems to work. I'm not sure what the "proper" way to distinguish
-    # between gzip'd and bzip2'd files is.
-    if ($testChars eq "BZ")
+    # between gzip'd and bzip2'd and tzip'd files is.
+    if ($testChars eq "TZ")
+    {
+      print "DEBUG: Trying to decompress using tzip.\n" if DEBUG;
+      open(TMP,"|tzip -cd >$tempFile") || cleanExit "Can't create $tempFile $!";
+    }
+    elsif ($testChars eq "BZ")
     {
       print "DEBUG: Trying to decompress using bzip2.\n" if DEBUG;
       open(TMP,"|bzip2 -d >$tempFile") || cleanExit "Can't create $tempFile $!";
@@ -338,6 +380,8 @@ else
     print TMP $testChars;
     print TMP while <$fileHandle>;
     close TMP;
+    # Make sure our email stays private!
+    chmod 0600, $tempFile;
 
     $fileHandle->close() || cleanExit "Error writing $tempFile $!";
 
@@ -357,6 +401,8 @@ else
     open(TMP,">$tempFile") || cleanExit "Can't create $tempFile $!";
     print TMP while <$fileHandle>;
     close TMP;
+    # Make sure our email stays private!
+    chmod 0600, $tempFile;
 
     $fileHandle->close() || cleanExit "Error writing $tempFile $!";
 
@@ -661,7 +707,7 @@ elsif ($datestring =~ /^between (.*) and (.*)/)
   $date1 = &ParseDate($1);
   $date2 = &ParseDate($2);
 
-  cleanExit "\"$1\" is not a valid date\n" if (!$date1);
+  cleanExit "\"$1\" is not a valid date" if (!$date1);
   cleanExit "\"$2\" is not a valid date" if (!$date2);
 
   # Swap the dates if the user gave them backwards.
@@ -760,7 +806,7 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [-e <regex>] [-vihblrm] [-d "datespec"] [mailbox ...]
+  grepmail [-vihblrm] [-e <regex>] [-d "datespec"] [mailbox ...]
 
 =head1 DESCRIPTION
 
@@ -775,8 +821,8 @@ When redirected to a file, the result is another mailbox, which can, in turn,
 be handled by standard User Agents, such as I<elm>, or even used as input for
 another instance of I<grepmail>.
 
-The pattern is optional if -d is used, and must precede all flags unless it is
-specified using -e.
+The pattern is optional if -d is used, and must precede the -d flag unless it
+is specified using -e.
 
 =back
 
@@ -796,8 +842,8 @@ globbing (shell expansion). To search for more than one pattern, use the form
 =item B<mailbox>
 
 Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.  The
-mailboxes may be compressed by gzip or bzip2, in which case gunzip must be
-installed on the system.
+mailboxes may be compressed by gzip, bzip2, or tzip, in which case gunzip,
+bzip2, or tzip must be installed on the system.
 
 If no mailbox is specified, takes input from stdin, which can be compressed or
 not. grepmail's behavior is undefined when ASCII and binary data is piped
@@ -864,26 +910,26 @@ pertains to research:
 Get all email you received since 8/20/98 that wasn't about research or your
 job, ignoring case:
 
-  grepmail "(research|job)" -i -d "since 8/20/98" -v saved-mail
+  grepmail -iv "(research|job)" -d "since 8/20/98" saved-mail
 
 Get all email about mime but not about Netscape. Constrain the search to match
 the body, since most headers contain the text "mime":
 
-  grepmail mime -b saved-mail | grepmail Netscape -v
+  grepmail -b mime saved-mail | grepmail Netscape -v
 
 Print a list of all mailboxes containing a message from Rodney. Constrain the
 search to the headers, since quoted emails may match the pattern:
 
-  grepmail "^From.*Rodney" -h -l saved-mail*
+  grepmail -hl "^From.*Rodney" saved-mail*
 
 Find all emails with the text "Pilot" in both the header and the body:
 
-  grepmail "Pilot" -h -b saved-mail*
+  grepmail -hb "Pilot" saved-mail*
 
 Print a count of the number of messages about grepmail in all saved-mail
 mailboxes:
 
-  grepmail grepmail -b -r saved-mail*
+  grepmail -br grepmail saved-mail*
 
 =head1 AUTHOR
 
