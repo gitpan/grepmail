@@ -1,10 +1,21 @@
 #!/usr/bin/perl -w
 
-# grepmail version 1.9
+# use perl                                  -*- mode: Perl; -*-
+eval 'exec perl -S $0 "$@"'
+  if $running_under_some_shell;
+
+use vars qw($running_under_some_shell);         # no whining!
+
+require 5.003;
+
+# grepmail version 2.0
 
 # Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 # and returns those emails that match it. Piped input is allowed, and date
 # restrictions are supported.
+
+# Do a pod2text on this file to get full documentation, or pod2man to get
+# man pages.
 
 # Written by David Coppit (coppit@cs.virginia.edu,
 #  http://www.cs.virginia.edu/~dwc3q/index.html)
@@ -15,6 +26,8 @@
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 2.0 Added POD documentation at the end of the script (thanks, Jeffrey
+#   Haemer <jsh@boulder.qms.com>). -h for headers only -b for body only
 # 1.9 "Ignore empty files" by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>.
 #   Emails without dates are now automatically output no matter what the
 #   date specification is. (Better safe than sorry!)
@@ -35,6 +48,7 @@
 use strict;
 use FileHandle;
 use Getopt::Std;
+use Mail::Internet;
 use Carp;
 
 my (%opts, $pattern, $unzipMethod);
@@ -54,17 +68,16 @@ BEGIN
   }
 }
 
-# Can't leave this undef 
-$opts{v}||=0;
-
 # There should be at least one thing left: the pattern. (If no
 # file is given, then STDIN is used.)
 
-if (($#ARGV < 0) || $opts{h})
+if ($#ARGV < 0)
 {
   print <<EOF;
-usage: grepmail [-vi] [-d \"datespec\"] <expr> <files...>
+usage: grepmail [-vihb] [-d \"datespec\"] <expr> <files...>
 
+-h Search headers only
+-b Search body only
 -i Ignore case in the search expression
 -v Output emails that don't match the expression
 
@@ -84,6 +97,9 @@ exit (1);
 
 # Grab the search pattern from the arg list
 $pattern = shift @ARGV;
+
+# Make it insensitive if we need to
+$pattern = "(?i)$pattern" if ($opts{i});
 
 my ($daterestriction, $date1, $date2);
 
@@ -163,26 +179,47 @@ else
 sub ProcessMailFile ($)
 {
 my $fileHandle = shift @_;
-my ($whole_email,$found);
+my ($whole_email,$header,$body,$found);
 my @email;
-my $blank = 1;
+my $firstLine = 1;
 while (<$fileHandle>)
 {
   # Code ripped from Mail::Util
-  if (($blank && /^From .*\d{4}/) || eof) 
+  if ((!$firstLine && /^From .*\d{4}/) || eof) 
   {
     push @email,$_ if eof;
     $whole_email = join("",@email);
-    $found = ($whole_email =~ /$pattern/o ||
-         ((exists $opts{i}) && ($whole_email =~ /$pattern/oi)));
-    $found ^= $opts{v};
-    &CheckDate($whole_email) if scalar(@email) && $found;
+
+    $whole_email =~ /\n\n/o;
+    my $header = "$`\n";
+    my $body = $';
+
+    if ($opts{b})
+    {
+      $found = ($body =~ /$pattern/o);
+    }
+    elsif ($opts{h})
+    {
+      $found = ($header =~ /$pattern/o);
+    }
+    else
+    {
+      $found = ($whole_email =~ /$pattern/o);
+    }
+
+    $found = !$found if ($opts{v});
+
+    if (scalar(@email) && $found && &CheckDate($whole_email))
+    {
+      print $whole_email;
+    }
+
     @email = ( $_ );
-    $blank = $found = 0;
+    $found = 0;
   }
   else
   {
-    $blank = m#^$#;
+    $firstLine = 0;
     push(@email, $_);
   }
 }
@@ -217,7 +254,7 @@ else
   $isInDate = 1;
 }
 
-print $email if $isInDate;;
+return $isInDate;
 
 }
 
@@ -360,3 +397,104 @@ else
 }
 
 }
+
+#-------------------------------------------------------------------------------
+
+=head1 NAME
+
+grepmail - search mailboxes for mail matching a regular expression
+
+=head1 SYNOPSIS
+
+  grepmail [-bhvi] [-d "datespec"] <regex> [mailbox ...]
+
+=head1 DESCRIPTION
+
+=over 2
+
+I<grepmail> looks for mail messages containing a pattern, and prints the
+resulting messages on standard out.
+
+By default I<grepmail> looks in both header and body for the specified pattern.
+
+When redirected to a file, the result is another mailbox, which can, in turn,
+be handled by standard User Agents, such as I<elm>, or even used as input for
+another instance of I<grepmail>.
+
+=back
+
+=head1 OPTIONS AND ARGUMENTS
+
+Many of the options and arguments are analogous to those of grep.
+
+=over 8
+
+=item B<pattern>
+
+The pattern to search for in the mail message.  May be any Perl regular
+expression, but should be quoted on the command line to protect against
+globbing (shell expansion).
+
+=item B<mailbox>
+
+Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.  The
+mailboxes may be zipped by gzip, in which case zcat must be installed on the
+system.  If no mailbox is specified, takes input from stdin.
+
+=item B<-b>
+
+Look only in the bodies of mail messages.
+
+=item B<-h>
+
+Look only in the headers of mail messages.
+
+=item B<-i>
+
+Make the search case-insensitive (by analogy to I<grep -i>).
+
+=item B<-v>
+
+Invert the sense of the search, (by analogy to I<grep -v>).
+
+=item B<-d>
+
+Date specifications must be of the form of:
+  - a date like "today", "1st thursday in June 1992", "05/10/93", "12:30 Dec 12th 1880", "8:00pm december tenth",
+  - OR "before", "after", or "since", followed by a date as defined above,
+  - OR "between <date> and <date>", where <date> is defined as above.
+
+=back
+
+=head1 EXAMPLES
+
+Get all email that you mailed yesterday
+
+  grepmail -d "yesterday" . sent-mail
+
+Get all email that you mailed before the first thursday in June 1998 that
+pertains to research:
+
+  grepmail -d "before 1st thursday in June 1992" research sent-mail
+
+Get all email you received since 8/20/98 that wasn't about research or your
+job, ignoring case:
+
+  grepmail -i -d "since 8/20/98" -v "(research|job)" saved-mail
+
+Get all email about mime but not about Netscape:
+
+  grepmail -b mime saved-mail | grepmail -v Netscape
+
+=head1 AUTHOR
+
+  David Coppit, <coppit@cs.virginia.edu>
+
+=head1 SEE ALSO
+
+elm(1), mail(1), grep(1), perl(1), printmail(1), Mail::Internet(3)
+Crocker,  D.  H., Standard for the
+Format of Arpa Internet Text Messages, RFC822.
+
+=cut
+

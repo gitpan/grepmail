@@ -1,4 +1,4 @@
-grepmail version 1.9
+grepmail version 2.0
 
 Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 and returns those emails that match it. Piped input is allowed, and date
@@ -11,4 +11,3 @@ Please send me any modifications you make. (for the better, that is. :)
 
 This code is distributed under the GNU General Public License (GPL). See
 http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
-
