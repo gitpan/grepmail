@@ -1,0 +1,348 @@
+#!/usr/bin/perl -w
+
+# grepmail version 1.7
+
+# Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
+# and returns those emails that match it. Piped input is allowed, and date
+# restrictions are supported.
+
+# Written by David Coppit (coppit@cs.virginia.edu,
+#  http://www.cs.virginia.edu/~dwc3q/index.html)
+
+# Please send me any modifications you make. (for the better, that is. :)
+
+# This code is distributed under the GNU General Public License (GPL). See
+# http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
+
+# Version History (major changes only)
+# 1.7 Sped up by Andrew Johnson. It no longer looks for dates unless
+#   the email matches the search string.
+# 1.6 removed use of Compress::Zlib because it was 30% slower, complicated the
+#   code, and because any user with gzip'd mail has zcat...
+# 1.5 Andrew Johnson <ajohnson@gpu.srv.ualberta.ca> fixed a couple of bugs.
+# 1.4 Incorporated conditional loading of the date module, use of
+#   compress::Zlib instead of shelling out to gunzip, as well as some bug
+#   fixes, as submitted by Andrew Johnson <ajohnson@gpu.srv.ualberta.ca>
+#   (Many thanks!). Also restructured the code a bit.
+# 1.3 Made it pipeable so you can do:
+#   grepmail <pattern> file | grepmail <pattern>
+# 1.1 Support for dates.
+# 1.0 Initial version, with -v -i, and gzip support
+
+use strict;
+use FileHandle;
+use Getopt::Std;
+use Carp;
+
+my (%opts, $pattern, $unzipMethod);
+
+BEGIN
+{
+  getopt("d",\%opts);
+
+  if ($opts{d})
+  {
+    unless (eval "require Date::Manip")
+    {
+      die "You specified -d, but do not have Date::Manip. Get it from CPAN.\n";
+    }
+
+    import Date::Manip;
+  }
+}
+
+# Can't leave this undef 
+$opts{v}||=0;
+
+# There should be at least one thing left: the pattern. (If no
+# file is given, then STDIN is used.)
+
+if (($#ARGV < 0) || $opts{h})
+{
+  print <<EOF;
+usage: grepmail [-vi] [-d \"datespec\"] <expr> <files...>
+
+-i Ignore case in the search expression
+-v Output emails that don't match the expression
+
+Date specifications must be of the form of:
+a date like "today", "1st thursday in June 1992", "05/10/93",
+  "12:30 Dec 12th 1880", "8:00pm december tenth",
+OR "before", "after", or "since", followed by a date as defined above,
+OR "between <date> and <date>", where <date> is defined as above.
+
+Files can be ASCII or gzip'd ASCII.
+
+You can also pipe STDIN to grepmail, using gunzip to decompress mail folders.
+EOF
+
+exit (1);
+}
+
+# Grab the search pattern from the arg list
+$pattern = shift @ARGV;
+
+my ($daterestriction, $date1, $date2);
+
+if ($opts{d})
+{
+  ($daterestriction,$date1,$date2) = &ProcessDate($opts{d});
+}
+else
+{
+  $daterestriction = "none";
+}
+
+# If the user provided input files...
+if (@ARGV)
+{
+  # For each input file...
+  foreach my $file (@ARGV)
+  {
+    # If it's not a gzipped file
+    if ($file !~ /\.(gz|Z)$/)
+    {
+      warn "** Skipping binary file: '$file' **\n" and next if -B $file;
+      my $fileHandle = new FileHandle;
+      $fileHandle->open($file) || die "Can't open $file.\n";
+      ProcessMailFile($fileHandle);
+      $fileHandle->close();
+    }
+    # If it is a gzipped file
+    else
+    {
+      my $tempFile = "/tmp/$$";
+      `zcat $file > $tempFile`;
+      my $fileHandle = new FileHandle;
+      $fileHandle->open($tempFile)
+          || die "Can't open temporary file used to decompress the file $file.\n";
+      ProcessMailFile($fileHandle);
+      $fileHandle->close();
+      unlink $tempFile;
+    }
+    
+  }
+}
+# Using STDIN
+else
+{ 
+  my $fileHandle = new FileHandle;
+  $fileHandle->open("<&STDIN") || die "Can't dup STDIN $!";
+
+  # If it looks binary, try to unzip it.
+  if (-B $fileHandle)
+  {
+    binmode $fileHandle;
+    my $tempFile = "/tmp/$$";
+    open(TMP,"|zcat >$tempFile") || die "Can't create $tempFile $!";
+    binmode TMP;
+    print TMP while <$fileHandle>;
+    close TMP;
+    $fileHandle->close()||die "Error writing $tempFile $!";
+    $fileHandle->open($tempFile) || die "Can't open $tempFile $!";
+    ProcessMailFile($fileHandle);
+    $fileHandle->close();
+    unlink $tempFile;      
+  }
+  # Otherwise process it directly
+  else
+  {
+    ProcessMailFile($fileHandle);
+    $fileHandle->close();
+  }
+}
+#-------------------------------------------------------------------------------
+
+sub ProcessMailFile ($)
+{
+my $fileHandle = shift @_;
+my ($whole_email,$found);
+my @email;
+my $blank = 1;
+while (<$fileHandle>)
+{
+  # Code ripped from Mail::Util
+  if (($blank && /^From .*\d{4}/) || eof) 
+  {
+    push @email,$_ if eof;
+    $whole_email = join("",@email);
+    $found = ($whole_email =~ /$pattern/o ||
+         ((exists $opts{i}) && ($whole_email =~ /$pattern/oi)));
+    $found ^= $opts{v};
+    &CheckDate($whole_email) if scalar(@email) && $found;
+    @email = ( $_ );
+    $blank = $found = 0;
+  }
+  else
+  {
+    $blank = m#^$#;
+    push(@email, $_);
+  }
+}
+
+}
+
+
+#-------------------------------------------------------------------------------
+
+sub CheckDate($)
+{
+my $email = shift;
+my ($emailDate, $isInDate);
+$emailDate = "";
+$isInDate = 0;
+
+if ($opts{d})
+{
+  $email =~ /^Date:\s*(\S*\s*\S*\s*\S*\s*\S*\s*\S*)/m;
+  $emailDate = &ParseDate($1);
+  $isInDate = &IsInDate($emailDate,$daterestriction,$date1,$date2);
+}
+else
+{
+  $isInDate = 1;
+}
+
+print $email if $isInDate;;
+
+}
+
+#-------------------------------------------------------------------------------
+
+# Figure out what kind of date restriction they want, and what the dates in
+# question are.
+sub ProcessDate($)
+{
+my ($daterestriction, $date1, $date2);
+
+if(!defined($_[0]))
+{
+  return ("none","","");
+}
+
+my $datestring = $_[0];
+
+if ($datestring =~ /^before (.*)/)
+{
+  $daterestriction = "before";
+  $date1 = &ParseDate($1);
+  $date2 = "";
+
+  if (!$date1)
+  {
+    die "\"$1\" is not a valid date\n";
+  }
+}
+elsif ($datestring =~ /^(after |since )(.*)/)
+{
+  $daterestriction = "after";
+  $date1 = &ParseDate($2);
+  $date2 = "";
+
+  if (!$date1)
+  {
+    die "\"$2\" is not a valid date\n";
+  }
+}
+elsif ($datestring =~ /^between (.*) and (.*)/)
+{
+  $daterestriction = "between";
+  $date1 = &ParseDate($1);
+  $date2 = &ParseDate($2);
+
+  if (!$date1)
+  {
+    die "\"$1\" is not a valid date\n";
+  }
+  if (!$date2)
+  {
+    die "\"$2\" is not a valid date\n";
+  }
+
+  # Swap the dates if the user gave them backwards.
+  if ($date1 gt $date2)
+  {
+    my $temp;
+    $temp = $date1;
+    $date1 = $date2;
+    $date2 = $temp;
+  }
+
+}
+elsif ($date1 = &ParseDate($datestring))
+{
+  $daterestriction = "on"
+}
+else
+{
+  die "Invalid date specification. Use \"$0 -h\" for help\n";
+}
+
+return ($daterestriction,$date1,$date2);
+
+}
+
+#-------------------------------------------------------------------------------
+
+sub IsInDate($$$$)
+{
+my ($emailDate,$daterestriction,$date1,$date2);
+$emailDate = shift @_;
+$daterestriction = shift @_;
+$date1 = shift @_;
+$date2 = shift @_;
+
+# Here we do the date checking.
+if ($daterestriction eq "none")
+{
+  return 1;
+}
+else
+{
+  if ($daterestriction eq "before")
+  {
+    if ($emailDate lt $date1)
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+  elsif ($daterestriction eq "after")
+  {
+    if ($emailDate gt $date1)
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+  elsif ($daterestriction eq "on")
+  {
+    if (&UnixDate($emailDate,"%m %d %Y") eq &UnixDate($date1,"%m %d %Y"))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+  elsif ($daterestriction eq "between")
+  {
+    if (($emailDate gt $date1) && ($emailDate lt $date2))
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+  }
+}
+
+}
