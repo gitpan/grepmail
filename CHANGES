@@ -1,3 +1,13 @@
+New in version 4.41:
+- Support for Gnus-style mail files added (Thanks to Werner Bosse
+  <Werner.Bosse@alcatel.de> for the patch.)
+- Test mail files tweaked to make the test cases work better across all time
+  zones. (Thanks to Andreas Kutschera <Andreas.Kutschera@bln.siemens.de> for
+  the patch.)
+- Added check for unparsable dates in email headers.
+- Fixed a Perl warning raised when date parsing fails.
+- Added instructions for getting the necessary modules to README.
+
 New in version 4.40:
 - Date::Parse and Date::Manip version unified -- Date::Parse is now required,
   and Date::Manip (if present) is used to parse complex dates. (Patch by

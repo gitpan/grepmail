@@ -4,14 +4,40 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
+New in version 4.41:
+- Support for Gnus-style mail files added 
+- Test mail files tweaked to make the test cases work better across all time
+  zones. 
+- Added check for unparsable dates in email headers.
+- Fixed a Perl warning raised when date parsing fails.
+- Added instructions for getting the necessary modules to README.
+
 New in version 4.40:
 - Date::Parse and Date::Manip version unified -- Date::Parse is now required,
   and Date::Manip (if present) is used to parse complex dates
 
-New in version 4.31:
-- Distro has missing test cases for -u functionality. Doh!
-
 See the file CHANGES for a complete change history and credits.
+
+
+MODULE DEPENDENCIES
+
+grepmail requires the Date::Parse module. If the user wants to use more
+complex date specifications with the -d flag, then Date::Manip should be
+installed as well.
+
+The Date::Parse module is part of the TimeDate distribution, which can be
+downloaded from:
+
+  http://www.perl.com/CPAN/authors/id/GBARR/
+
+Date::Manip is at:
+
+  http://www.perl.com/CPAN/authors/id/SBECK/
+
+Alternatively, installation can be done automatically using the CPAN module:
+
+  perl -MCPAN -e 'install Date::Parse'
+  perl -MCPAN -e 'install Date::Manip'
 
 
 INSTALLATION
