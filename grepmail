@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/cs/bin/perl -w
 
 # use perl                                  -*- mode: Perl; -*-
 eval 'exec perl -S $0 "$@"'
@@ -8,11 +8,11 @@ use vars qw($running_under_some_shell);         # no whining!
 
 require 5.003;
 
-# grepmail version 3.0
+# grepmail version 3.1
 
-# Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
-# and returns those emails that match it. Piped input is allowed, and date
-# restrictions are supported.
+# Grepmail searches a normal or gzipped mailbox for a given regular expression
+# and returns those emails that match the query. It also supports piped input,
+# and searches constrained by date. 
 
 # Do a pod2text on this file to get full documentation, or pod2man to get
 # man pages.
@@ -26,6 +26,11 @@ require 5.003;
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 3.1 Added -m, which prints the folder name in which the email was found as
+#   an "X-Mailfolder" addition to the header (by Ulli Horlacher
+#   <framstag@moep.bb.bawue.de>). Improved error checking on flags. Changed
+#   "zcat" to "gunzip -c" to help with backwards compatibility with older
+#   versions of gzip (thanks to Eugene Kim <eekim@eekim.com>).
 # 3.0 -h and -b can be used together. Rewrote the ProcessMailFile to run 2 to
 #   3 times faster, and use less memory. Correctly diagnoses directories as
 #   such (by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>).
@@ -74,13 +79,15 @@ use Carp;
 sub usage
 {
 <<EOF;
-usage: grepmail [[-e] <expr>] [-vihblr] [-d \"datespec\"] <files...>
+usage: grepmail [[-e] <expr>] [-vihblrm] [-d \"datespec\"] <files...>
 
--h Search headers only
--b Search body only
+-h Search must match header
+-b Search must match body
 -l Output the names of files having an email matching the expression
 -r Output the names of the files and the number of emails matching the
    expression
+-m Append "X-Mailfolder: <folder>" to all headers to indicate in which folder
+   the match occurred
 -i Ignore case in the search expression
 -v Output emails that don't match the expression
 -e Explicitely name expr (when searching for strings beginning with "-")
@@ -104,7 +111,8 @@ BEGIN
 {
   $pattern = "";
 
-  die usage if ($#ARGV < 0);
+  # Print usage error if no arguments given
+  print usage and exit if ($#ARGV < 0);
 
   if ($ARGV[0] !~ /^-/)
   {
@@ -113,14 +121,24 @@ BEGIN
 
   getopt("ed",\%opts);
 
+# For debugging
+#foreach my $i (keys %opts)
+#{
+#  print "$i: $opts{$i}\n";
+#}
+
   if ($opts{e})
   {
-    die "You specified two search patterns\n" if ($pattern ne "");
+    print "You specified two search patterns.\n" and exit if ($pattern ne "");
     
     $pattern = $opts{e};
   }
   elsif ($pattern eq "")
   {
+    # The only time you can't specify the pattern is when -d is being used.
+    # This should catch people who do "grepmail -h" thinking it's help.
+    print usage and exit if !$opts{d};
+
     $pattern = ".";
   }
 
@@ -128,7 +146,8 @@ BEGIN
   {
     unless (eval "require Date::Manip")
     {
-      die "You specified -d, but do not have Date::Manip. Get it from CPAN.\n";
+      print "You specified -d, but do not have Date::Manip. Get it from CPAN.\n";
+      exit;
     }
 
     import Date::Manip;
@@ -151,16 +170,10 @@ else
   $daterestriction = "none";
 }
 
-
 # For debugging
-#foreach my $i (keys %opts)
-#{
-#  print "$i: $opts{$i}\n";
-#}
 #print "PATTERN: $pattern\n";
-#print "ARGV: @ARGV\n";
-#die;
-
+#print "FILES: @ARGV\n";
+#exit;
 
 # If the user provided input files...
 if (@ARGV)
@@ -188,7 +201,7 @@ if (@ARGV)
     else
     {
       my $tempFile = "/tmp/$$";
-      `zcat $file > $tempFile`;
+      `gunzip -c $file > $tempFile`;
       my $fileHandle = new FileHandle;
       $fileHandle->open($tempFile)
           || die "Can't open temporary file used to decompress the file $file.\n";
@@ -210,7 +223,7 @@ else
   {
     binmode $fileHandle;
     my $tempFile = "/tmp/$$";
-    open(TMP,"|zcat >$tempFile") || die "Can't create $tempFile $!";
+    open(TMP,"|gunzip -c >$tempFile") || die "Can't create $tempFile $!";
     binmode TMP;
     print TMP while <$fileHandle>;
     close TMP;
@@ -292,7 +305,7 @@ while (!eof($fileHandle))
     }
     else
     {
-      PrintEmail($fileHandle,$start);
+      PrintEmail($fileHandle,$fileName,$start);
     }
 
     next;
@@ -373,7 +386,7 @@ while (!eof($fileHandle))
     }
     else
     {
-      PrintEmail($fileHandle,$start);
+      PrintEmail($fileHandle,$fileName,$start);
     }
   }
   else
@@ -406,14 +419,23 @@ sub SkipToNextEmail($)
 
 #-------------------------------------------------------------------------------
 
-sub PrintEmail($$)
+sub PrintEmail($$$)
 {
   my $fileHandle = shift;
+  my $fileName = shift;
   my $start = shift;
   my $paragraph;
 
   seek ($fileHandle, $start, 0);
   $paragraph = <$fileHandle>;
+
+  # Print the mailfolder in the headers if -m was given
+  if ($opts{"m"})
+  {
+    chop $paragraph;
+    $paragraph .= "X-Mailfolder: $fileName\n\n";
+  }
+
   do
   {
     print $paragraph;
@@ -604,7 +626,7 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [-e <regex>] [-vihblr] [-d "datespec"] [mailbox ...]
+  grepmail [-e <regex>] [-vihblrm] [-d "datespec"] [mailbox ...]
 
 =head1 DESCRIPTION
 
@@ -640,7 +662,7 @@ globbing (shell expansion). To search for more than one pattern, use the form
 =item B<mailbox>
 
 Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.  The
-mailboxes may be zipped by gzip, in which case zcat must be installed on the
+mailboxes may be zipped by gzip, in which case gunzip must be installed on the
 system.  If no mailbox is specified, takes input from stdin, which can be
 gzip'd or not.
 
@@ -671,6 +693,11 @@ to I<grep -l>).
 
 Generate a report of the names of the files containing emails matching the
 expression, along with a count of the number of matching emails.
+
+=item B<-m>
+
+Append "X-Mailfolder: <folder>" to all email headers, indicating which folder
+contained the matched email.
 
 =item B<-e>
 

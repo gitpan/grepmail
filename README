@@ -1,18 +1,13 @@
-grepmail version 3.0
+grepmail version 3.1
 
 Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 and returns those emails that match it. Piped input is allowed, and date
 restrictions are supported.
 
-New in this version: This is a major rewrite of the core code. It now uses
-file pointers to read the emails paragraph by paragraph, instead of slurping
-the whole email into a variable. The result is 2 to 3 time faster processing,
-and memory usage that is proportional to the largest paragraph in the mailbox.
-(Typically this is a uuencoded attachment. If enough people complain about the
-memory usage, I'll make a flag to ignore attachments.)The semantics of -b and
--h have changed so that using both of the flags is possible, thereby
-specifying that the match must occur in both the header and body. Also fixed a
-couple of annoyances.
+New in this version: Modified the decompression to be more compatible with
+older versions of gzip. Improved error checking so that "grepmail -h" prints a
+usage message. Added -m flag, which causes an "X-Mailfolder" line to be added
+to the header, thereby showing which folder contained the message.
 
 Written by David Coppit (coppit@cs.virginia.edu,
   http://www.cs.virginia.edu/~dwc3q/index.html)
