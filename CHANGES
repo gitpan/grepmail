@@ -3,6 +3,22 @@ Features which haven't made it in yet:
   <zbrown@tumblerings.org> for the excellent feature idea and a prototype
   implementation.)
 
+New in version 5.10:
+- Extracted mail parsing into the new Mail::Mbox::MessageParser module.
+- Fixed small performance loss bugs in short-circuit matching of headers which
+  were introduced in the last version
+- Improved performance a bit.
+- The Makefile.PL now uses the default values when run non-interactively.
+- Caching is now enabled by default. (It's no longer experimental.) Users can
+  disable it during installation.
+- Date specifications without times (e.g. "today") are interpreted as midnight
+  of the given day instead of the current time of that day. grepmail now
+  relies on Date::Manip to handle this--users must upgrade Date::Manip to get
+  this support. (Thanks to Reuben Thomas <rrt@sc3d.org> for working with
+  Sullivan Beck <sbeck@cise.ufl.edu> to get TodayIsMidnight added to
+  Date::Manip.)
+- Restructured test cases
+
 New in version 5.00:
 - grepmail is now orders of magnitude faster for mailboxes which have very
   large (>30MB) emails in them

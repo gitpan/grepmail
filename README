@@ -97,31 +97,27 @@ over time. Let me know if this is a problem.
 
 MODULE DEPENDENCIES
 
+- Mail::Mbox::MessageParser: required
 - Date::Parse: required if you want to search based on date (-d)
 - Date::Manip: required if you want to search using complex date
   specifications (-d)
 - Digest::MD5: not required, but can help grepmail use less memory if
   you are checking for unique emails (-u) and your emails don't have a
   Message-Id header
-- Inline >0.41: required if you want to use the mailbox parser written
-  in C (approximately 5% faster than default Perl parser).
 
 The modules can be found here:
 
+Mail::Mbox::MessageParser: http://search.cpan.org/search?dist=MailMboxMessageParser
 Date::Parse (in TimeDate): http://search.cpan.org/search?dist=TimeDate
 Date::Manip:               http://search.cpan.org/search?dist=DateManip
 Digest::MD5:               http://search.cpan.org/search?dist=Digest-MD5
-Storable:                  http://search.cpan.org/search?dist=Storable
-
-The last module is only necessary if you intend on using the experimental
-caching feature.
 
 Installation can also be done automatically using the CPAN module:
 
+  perl -MCPAN -e 'install Mail::Mbox::MessageParser'
   perl -MCPAN -e 'install Date::Parse'
   perl -MCPAN -e 'install Date::Manip'
   perl -MCPAN -e 'install Digest::MD5'
-  perl -MCPAN -e 'install Storable'
 
 
 INSTALLATION
@@ -133,13 +129,12 @@ INSTALLATION
   % make test
   % make install
 
-By default, "perl Makefile.PL" does an interactive installation. You can avoid
-the question about installing Mail::Folder::FastReader by specifying either
-"FASTREADER=0" or "FASTREADER=1". You can avoid the question about the
-installation location by specifying either "PREFIX=/installation/path" (for
-installation into a custom location), "INSTALLDIRS=site" (for installation
-into site-specific Perl directories), or "INSTALLDIRS=perl" (for installation
-into standard Perl directories).
+The "perl Makefile.PL" command will prompt you for an installation location if
+you run it interactively, and will use the default values if it is run
+non-iteractively. You can force it to run non-interactively by specifying
+either "PREFIX=/installation/path" (for installation into a custom location),
+"INSTALLDIRS=site" (for installation into site-specific Perl directories), or
+"INSTALLDIRS=perl" (for installation into standard Perl directories).
 
 If make test fails, please see the INSTALLATION PROBLEMS section below.
 
@@ -170,7 +165,7 @@ INSTALLATION PROBLEMS
 
 If "make test" fails, run
 
-  make testfunc
+  make test TEST_VERBOSE=1
 
 and see which test(s) are failing. Please email, to the address below, the
 test##.stderr and test##.stdout files for the test, which are located in
