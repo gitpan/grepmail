@@ -1,11 +1,8 @@
 #!/usr/bin/perl -w
 
-eval 'exec /usr/bin/perl -w -S $0 ${1+"$@"}'
-    if 0; # not running under some shell
-
 # grepmail
 
-$VERSION = '4.72';
+$VERSION = '4.80';
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
@@ -161,7 +158,15 @@ sub read_email
 
   # Look for the start of the next email
   LOOK_FOR_NEXT_HEADER:
-  while($READ_BUFFER =~ m/^From\s(.*\d:\d\d:\d\d\s\d{4}(?:\s[+-]\d{4})?|.*\d:\d\d\s.*\w{2,3}\s\d{4})$/mg)
+  while ($READ_BUFFER =~ m/^From\s
+    (
+      # Skip names, months, days
+      (?> [^:]+ ) 
+      # Match time
+      (?: :\d\d){1,2}
+      # Match time zone (EST), hour shift (+0500), and-or year
+      (?: \s+ (?: [A-Z]{2,3} | [+-]?\d{4} ) ){1,3}
+    )$/xmg)
   {
     $END = pos($READ_BUFFER) - length($1) - 5;
 
@@ -357,6 +362,34 @@ else
 sub ProcessDate($);
 sub GetFiles(@);
 
+# Check for -E flag incompatibilities.
+if ($opts{'E'})
+{
+  # Have to do -Y before -h because the former implies the latter
+  for my $option qw(e M S Y)
+  {
+    if ($opts{$option})
+    {
+      reportAndExit "-$option can not be used with -E";
+    }
+  }
+
+  if ($opts{'i'})
+  {
+    reportAndExit "-i can not be used with -E. Use -E '\$email =~ /pattern/i' instead";
+  }
+
+  if ($opts{'b'})
+  {
+    reportAndExit "-b can not be used with -E. Use -E '\$email_body =~ /pattern/' instead";
+  }
+
+  if ($opts{'h'})
+  {
+    reportAndExit "-h can not be used with -E. Use -E '\$email_header =~ /pattern/' instead";
+  }
+}
+
 # Make the pattern insensitive if we need to
 $pattern = "(?i)$pattern" if ($opts{'i'});
 
@@ -407,7 +440,8 @@ sub Get_Options
   # Check for --help, the standard usage command
   print help() and exit(0) if grep { /^--help$/ } @ARGV;
 
-  my @valid_options = qw( D e i q h b v l r R a M m s u n Z H S d V X Y );
+  my @valid_options =
+    qw( D e E F i q h b v l r R a M m s u n Z H S d V X Y );
 
   my %opts;
 
@@ -419,14 +453,14 @@ sub Get_Options
   $opts{'X'} = '^-- $';
 
   # Ensure valid options
-  getopt("edsXY",\%opts);
+  getopt("eEdsXY",\%opts);
 
   # Here we have to deal with the possibility that the user specified the
   # search pattern without the -e flag.
 
   # getopts stops as soon as it sees a non-flag, so $ARGV[0] may contain the
   # pattern with more flags after it.
-  unless ($opts{'e'})
+  unless ($opts{'e'} || $opts{'E'})
   {
     my $missing_flags = '';
 
@@ -472,11 +506,23 @@ sub Get_Options
     }
   }
 
-  if ($opts{'e'})
+  if ($opts{'e'} || $opts{'E'})
   {
     print "You specified two search patterns.\n" and exit (1)
       if defined $pattern;
-    $pattern = $opts{'e'};
+
+    if ($opts{'e'})
+    {
+      $pattern = $opts{'e'};
+    }
+    else
+    {
+      $pattern = $opts{'E'};
+#
+#      if ($pattern !~ /=~/)
+#      {
+#      }
+    }
   }
   elsif (defined $opts{'V'})
   {
@@ -570,8 +616,16 @@ sub ValidatePattern
 
   local $@;
 
-  eval {'string' =~ /$pattern/};
-  reportAndExit "The pattern \"$pattern\" is invalid.\n" if $@;
+  if ($opts{'E'})
+  {
+    eval {if ($pattern) {}};
+    reportAndExit "The match condition \"$pattern\" is invalid.\n" if $@;
+  }
+  else
+  {
+    eval {'string' =~ /$pattern/};
+    reportAndExit "The pattern \"$pattern\" is invalid.\n" if $@;
+  }
 }
 
 #-------------------------------------------------------------------------------
@@ -736,7 +790,7 @@ sub HandleInputFiles
       next;
     }
 
-    if (!IsMailbox($fileHandle))
+    if (!$opts{'F'} && !IsMailbox($fileHandle))
     {
       warn "** Skipping non-mailbox ASCII file: '$file'\n" unless $opts{'q'};
       next;
@@ -822,36 +876,81 @@ sub HandleStandardInput
     }
     else
     {
-      dprint 'Trying to decompress using gunzip.';
+      dprint 'Trying to decompress using gunzip2.';
       $filter = 'gzip -dc';
     }
 
-    # Here we invoke another copy of grepmail with a filter in front.
-    my $newGrepmail = new FileHandle;
-    $newGrepmail->open("|$filter 2>/dev/null|$commandLine")
-      or warn "** Can't execute \"$filter\" on STDIN: $!\n"
-        unless $opts{'q'};
+    # Implicit fork
+    my $decompressedFileHandle = new FileHandle;
+    my $pid = $decompressedFileHandle->open('-|');
 
-    while (!eof $fileHandle)
+    unless (defined($pid))
     {
-      my $temp = <$fileHandle>;
-      print $newGrepmail $temp;
+      warn "** Can't fork to decompress standard input, stopping\n"
+        unless $opts{'q'};
+      return;
     }
 
-    $newGrepmail->close()
+    # In child. Write to the parent, giving it all the data to decompress.
+    # We have to do it this way because other methods (e.g. open2) require us
+    # to feed the filter as we use the filtered data. This method allows us to
+    # keep the remainder of the code the same for both compressed and
+    # uncompressed input.
+    unless ($pid)
+    {
+      open(FRONT_OF_PIPE, "|$filter 2>/dev/null")
+        or warn "** Can't execute \"$filter\" on STDIN: $!\n"
+          unless $opts{'q'};
+
+      while (!eof $fileHandle)
+      {
+        my $temp = <$fileHandle>;
+        print FRONT_OF_PIPE $temp;
+      }
+
+      $fileHandle->close()
+        or warn "** Can't execute \"$filter\" on STDIN: $!\n"
+          unless $opts{'q'};
+      # We intentionally don't check for error here. This is because the
+      # parent may have aborted, in which case we let it take care of
+      # error messages. (e.g. Non-mailbox standard input.)
+      close FRONT_OF_PIPE;
+
+      return;
+    }
+
+    # In parent
+    if (!$opts{'F'} && !IsMailbox($decompressedFileHandle))
+    {
+      warn "** Skipping non-mailbox standard input\n" unless $opts{'q'};
+
+      $decompressedFileHandle->close()
+        or warn "** Can't execute \"$filter\" on STDIN: $!\n"
+          unless $opts{'q'};
+
+      return;
+    }
+
+    ProcessMailFile($decompressedFileHandle,"Standard input",1);
+
+    $decompressedFileHandle->close()
       or warn "** Can't execute \"$filter\" on STDIN: $!\n"
         unless $opts{'q'};
   }
   # Otherwise process it directly
   else
   {
-    if (!IsMailbox($fileHandle))
+    if (!$opts{'F'} && !IsMailbox($fileHandle))
     {
       warn "** Skipping non-mailbox standard input\n" unless $opts{'q'};
       return;
     }
 
     ProcessMailFile($fileHandle,"Standard input",1);
+
+    $fileHandle->close()
+      or warn "** Can't process STDIN: $!\n"
+        unless $opts{'q'};
   }
 }
 
@@ -892,7 +991,7 @@ sub PutBackString
 # Detects whether an ASCII file is a mailbox, based on whether it has
 # a line whose prefix is 'From' or 'X-From-Line:' or 'X-Draft-From:',
 # and another line whose prefix is 'Received ', 'Date:', 'Subject:',
-# 'X-Status:', or 'Status:'.
+# 'X-Status:', 'Status:', or 'To:'.
 
 sub IsMailbox
 {
@@ -907,8 +1006,10 @@ sub IsMailbox
   
   # X-From-Line is used by Gnus, and From is used by normal Unix
   # format. Newer versions of Gnus use X-Draft-From
-  if ($buffer =~ /^(X-Draft-From:|X-From-Line:|From)\s/im &&
-      $buffer =~ /^(Date|Subject|X-Status|Status):\s/im)
+#  if ($buffer =~ /^(X-Draft-From:|X-From-Line:|From)\s/im &&
+#      $buffer =~ /^(Date|Subject|X-Status|Status|To):\s/im)
+  if ($buffer =~ /^(X-Draft-From:|X-From-Line:|From:?)\s/im &&
+      $buffer =~ /^(Date|To|Bcc):\s/im)
   {
     return 1;
   }
@@ -916,6 +1017,349 @@ sub IsMailbox
   {
     return 0;
   }
+}
+
+#-------------------------------------------------------------------------------
+
+sub Do_Simple_Pattern_Matching
+{
+  my $email = shift;
+  my $email_header = shift;
+  my $email_body = shift;
+  my $fileHandle = shift;
+  my $fileName = shift;
+  my $number_files = shift;
+  my $numberOfMatches = shift;
+  my $line = shift;
+
+  dprint "Checking for early match or abort based on header information.";
+
+  my ($result,$matchesHeader) =
+    AnalyzeHeader($$email_header,$fileHandle,$pattern);
+
+  if ($result == $SKIP)
+  {
+    dprint "Doing an early abort based on header.";
+    return ($CONTINUE,$numberOfMatches);
+  }
+
+  if ($result == $PRINT)
+  {
+    dprint "Doing an early printout based on header.";
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+  
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+      return ($CONTINUE,$numberOfMatches);
+    }
+    else
+    {
+      PrintEmail($fileName,$$email_header,$$email_body,$number_files,$line)
+        if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+
+      return ($CONTINUE,$numberOfMatches);
+    }
+  }
+
+  #----------------------------------------------------------------
+
+  my $matchesBody = 0;
+
+  my $signature_offset = undef;
+
+  if ($opts{'S'} && $$email_body =~ m/($opts{'X'})/mg)
+  {
+    $signature_offset = pos($$email_body) - length($1);
+    pos($$email_body) = 0;
+  }
+
+  # Ignore the MIME attachments if -M was specified
+  if ($opts{'M'} &&
+     ($$email_header =~ /^Content-Type:.*?boundary=(?:"([^"]*)"|([^\n]*))/ism))
+  {
+    my $boundary;
+    $boundary = $1 if defined $1;
+    $boundary = $2 if defined $2;
+
+    dprint "Found attachments with boundary:\n  $boundary";
+
+    my @attachment_positions;
+
+    # Get each of the binary attachment beginnings and endings.
+    while ($$email_body =~ m/\n((?:--)?\Q$boundary\E(?:--)?\n(?:(.*?)\n\n)?)/sg)
+    {
+      my $position = pos($$email_body) - length($1);
+      my $header = $2;
+
+      # Remember that the beginning of the next attachment is the
+      # end of the previous.
+      $attachment_positions[-1]{'end'} = $position
+        if @attachment_positions;
+
+      # If it's the beginning of a binary attachment, store the position
+      if (defined $header && $header =~ /^Content-Type:\s+(?!text)/i)
+      {
+        $attachment_positions[$#attachment_positions+1]{'beginning'} =
+          $position;
+      }
+    }
+
+    pos($$email_body) = 0;
+
+    # Now search the body, ignoring any matches in binary
+    # attachments.
+    # Avoid perl 5.6 bug which causes spurious warning even though
+    # $pattern is defined.
+    local $^W = 0 if $] >= 5.006 && $] < 5.8;
+    SEARCH: while ($$email_body =~ m/($pattern)/omg)
+    {
+      my $position = pos($$email_body) - length($1);
+
+      last SEARCH if $opts{'S'} &&
+        defined $signature_offset && $position > $signature_offset;
+
+      foreach my $attachment (@attachment_positions)
+      {
+        next SEARCH
+          if ($position > $attachment->{'beginning'} &&
+              $position < $attachment->{'end'});
+      }
+
+      $matchesBody = 1;
+      last;
+    }
+  }
+  else
+  {
+    # Avoid perl 5.6 bug which causes spurious warning even though
+    # $pattern is defined.
+    local $^W = 0 if $] >= 5.006 && $] < 5.8;
+    if ($$email_body =~ m/($pattern)/omg)
+    {
+      my $position = pos($$email_body) - length($1);
+
+      $matchesBody = 1 unless $opts{'S'} && 
+        defined $signature_offset && $position > $signature_offset;
+    }
+  }
+
+  #----------------------------------------------------------------
+
+  my $matchesSize = length $$email < $opts{'s'};
+
+  #----------------------------------------------------------------
+
+  dprint "Checking for early match or abort based on header, body, " .
+    "and size information.";
+
+  my $isMatch = 1;
+  
+  $isMatch = 0 if  $opts{'s'} && !$matchesSize ||
+    $opts{'b'} && !$matchesBody ||
+    $opts{'h'} && !$matchesHeader ||
+    !$opts{'b'} && !$opts{'h'} && !($matchesBody || $matchesHeader);
+
+  if (!$isMatch && !$opts{'v'})
+  {
+    dprint "Doing an early abort based on header, body, and size.";
+    return ($CONTINUE,$numberOfMatches);
+  }
+  elsif (!$isMatch && $opts{'v'})
+  {
+    dprint "Doing an early printout based on header, body, and size.";
+  
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+      
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+      return ($CONTINUE,$numberOfMatches);
+    }
+    else
+    {
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,
+        $$email_body,$number_files,$line)
+          if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+
+      return ($CONTINUE,$numberOfMatches);
+    }
+  }
+
+  #----------------------------------------------------------------
+
+  dprint "Checking date constraint.";
+
+  $isMatch = 1;
+
+  {
+    my $matchesDate = CheckDate($email_header);
+    $isMatch = 0 if defined $opts{'d'} && !$matchesDate;
+
+    dprint "Email matches date constraint\n"
+      if defined $opts{'d'} && $matchesDate;
+    dprint "Email doesn't match date constraint\n"
+      if defined $opts{'d'} && !$matchesDate;
+  }
+
+  $isMatch = !$isMatch if $opts{'v'};
+
+  # If the match occurred in the right place...
+  if ($isMatch)
+  {
+    dprint "Email matches all patterns and constraints.";
+
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+    }
+    else
+    {
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,
+        $$email_body,$number_files,$line)
+          if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+    }
+  }
+  else
+  {
+    dprint "Email did not match all patterns and constraints.";
+  }
+
+  return ($CONTINUE,$numberOfMatches);
+}
+
+#-------------------------------------------------------------------------------
+
+sub Do_Complex_Pattern_Matching
+{
+  my $email = shift;
+  my $email_header = shift;
+  my $email_body = shift;
+  my $fileHandle = shift;
+  my $fileName = shift;
+  my $number_files = shift;
+  my $numberOfMatches = shift;
+  my $line = shift;
+
+  my $modified_pattern = $pattern;
+
+  $modified_pattern =~ s/\$email_header\b/\$\$email_header/g;
+  $modified_pattern =~ s/\$email_body\b/\$\$email_body/g;
+  $modified_pattern =~ s/\$email\b/\$\$email/g;
+  $modified_pattern =~ s#(=~\s*)/([^/]*)/#$1/$2/om#g;
+
+  my $matchesEmail;
+  eval " \$matchesEmail = $modified_pattern ? 1 : 0 ";
+
+  #----------------------------------------------------------------
+
+  my $matchesSize = length $$email < $opts{'s'};
+
+  #----------------------------------------------------------------
+
+  dprint "Checking for early match or abort based on header, body, " .
+    "and size information.";
+
+  my $isMatch = 1;
+  
+  $isMatch = 0 if  $opts{'s'} && !$matchesSize ||
+    !$matchesEmail;
+
+  if (!$isMatch && !$opts{'v'})
+  {
+    dprint "Doing an early abort based on header, body, and size.";
+    return ($CONTINUE,$numberOfMatches);
+  }
+  elsif (!$isMatch && $opts{'v'})
+  {
+    dprint "Doing an early printout based on header, body, and size.";
+  
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+      
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+      return ($CONTINUE,$numberOfMatches);
+    }
+    else
+    {
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,
+        $$email_body,$number_files,$line)
+          if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+
+      return ($CONTINUE,$numberOfMatches);
+    }
+  }
+
+  #----------------------------------------------------------------
+
+  dprint "Checking date constraint.";
+
+  $isMatch = 1;
+
+  {
+    my $matchesDate = CheckDate($email_header);
+    $isMatch = 0 if defined $opts{'d'} && !$matchesDate;
+
+    dprint "Email matches date constraint\n"
+      if defined $opts{'d'} && $matchesDate;
+    dprint "Email doesn't match date constraint\n"
+      if defined $opts{'d'} && !$matchesDate;
+  }
+
+  $isMatch = !$isMatch if $opts{'v'};
+
+  # If the match occurred in the right place...
+  if ($isMatch)
+  {
+    dprint "Email matches all patterns and constraints.";
+
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+    }
+    else
+    {
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,
+        $$email_body,$number_files,$line)
+          if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+    }
+  }
+  else
+  {
+    dprint "Email did not match all patterns and constraints.";
+  }
+
+  return ($CONTINUE,$numberOfMatches);
 }
 
 #-------------------------------------------------------------------------------
@@ -950,215 +1394,25 @@ sub ProcessMailFile
 
     #----------------------------------------------------------------
 
-    dprint "Checking for early match or abort based on header information.";
-
-    my ($result,$matchesHeader) =
-      AnalyzeHeader($email_header,$fileHandle,$pattern);
-
-    if ($result == $SKIP)
+    if ($opts{'E'})
     {
-      dprint "Doing an early abort based on header.";
-      next;
-    }
+      my $result;
+      ($result, $numberOfMatches) = 
+        Do_Complex_Pattern_Matching(\$email, \$email_header, \$email_body,
+          $fileHandle, $fileName, $number_files, $numberOfMatches, $line);
 
-    if ($result == $PRINT)
-    {
-      dprint "Doing an early printout based on header.";
-      if ($opts{'l'})
-      {
-        print "$fileName\n";
-    
-        # We can return since we found at least one email that matches.
-        return $DONE;
-      }
-      elsif ($opts{'r'})
-      {
-        $numberOfMatches++;
-        next;
-      }
-      else
-      {
-        PrintEmail($fileName,$email_header,$email_body,$number_files,$line)
-          if $opts{'u'} && NotADuplicate($email_header) || !$opts{'u'};
-
-        next;
-      }
-    }
-
-    #----------------------------------------------------------------
-
-    my $matchesBody = 0;
-
-    my $signature_offset = undef;
-
-    if ($opts{'S'} && $email_body =~ m/($opts{'X'})/mg)
-    {
-      $signature_offset = pos($email_body) - length($1);
-      pos($email_body) = 0;
-    }
-
-    # Ignore the MIME attachments if -M was specified
-    if ($opts{'M'} &&
-       ($email_header =~ /^Content-Type:.*?boundary=(?:"([^"]*)"|([^\n]*))/ism))
-    {
-      my $boundary;
-      $boundary = $1 if defined $1;
-      $boundary = $2 if defined $2;
-
-      dprint "Found attachments with boundary:\n  $boundary";
-
-      my @attachment_positions;
-
-      # Get each of the binary attachment beginnings and endings.
-      while ($email_body =~ m/\n((?:--)?\Q$boundary\E(?:--)?\n(?:(.*?)\n\n)?)/sg)
-      {
-        my $position = pos($email_body) - length($1);
-        my $header = $2;
-
-        # Remember that the beginning of the next attachment is the
-        # end of the previous.
-        $attachment_positions[-1]{'end'} = $position
-          if @attachment_positions;
-
-        # If it's the beginning of a binary attachment, store the position
-        if (defined $header && $header =~ /^Content-Type:\s+(?!text)/i)
-        {
-          $attachment_positions[$#attachment_positions+1]{'beginning'} =
-            $position;
-        }
-      }
-
-      pos($email_body) = 0;
-
-      # Now search the body, ignoring any matches in binary
-      # attachments.
-      # Avoid perl 5.6 bug which causes spurious warning even though
-      # $pattern is defined.
-      local $^W = 0 if $] >= 5.006 && $] < 5.8;
-      SEARCH: while ($email_body =~ m/($pattern)/omg)
-      {
-        my $position = pos($email_body) - length($1);
-
-        last SEARCH if $opts{'S'} &&
-          defined $signature_offset && $position > $signature_offset;
-
-        foreach my $attachment (@attachment_positions)
-        {
-          next SEARCH
-            if ($position > $attachment->{'beginning'} &&
-                $position < $attachment->{'end'});
-        }
-
-        $matchesBody = 1;
-        last;
-      }
+      return if $result == $DONE;
     }
     else
     {
-      # Avoid perl 5.6 bug which causes spurious warning even though
-      # $pattern is defined.
-      local $^W = 0 if $] >= 5.006 && $] < 5.8;
-      if ($email_body =~ m/($pattern)/omg)
-      {
-        my $position = pos($email_body) - length($1);
+      my $result;
+      ($result, $numberOfMatches) = 
+        Do_Simple_Pattern_Matching(\$email, \$email_header, \$email_body,
+          $fileHandle, $fileName, $number_files, $numberOfMatches, $line);
 
-        $matchesBody = 1 unless $opts{'S'} && 
-          defined $signature_offset && $position > $signature_offset;
-      }
+      return if $result == $DONE;
     }
 
-    #----------------------------------------------------------------
-
-    my $matchesSize = length $email < $opts{'s'};
-
-    #----------------------------------------------------------------
-
-    dprint "Checking for early match or abort based on header, body, " .
-      "and size information.";
-
-    my $isMatch = 1;
-    
-    $isMatch = 0 if  $opts{'s'} && !$matchesSize ||
-	    $opts{'b'} && !$matchesBody ||
-	    $opts{'h'} && !$matchesHeader ||
-	    !$opts{'b'} && !$opts{'h'} && !($matchesBody || $matchesHeader);
-
-    if (!$isMatch && !$opts{'v'})
-    {
-      dprint "Doing an early abort based on header, body, and size.";
-      next;
-    }
-    elsif (!$isMatch && $opts{'v'})
-    {
-      dprint "Doing an early printout based on header, body, and size.";
-    
-      if ($opts{'l'})
-      {
-        print "$fileName\n";
-        
-        # We can return since we found at least one email that matches.
-        return $DONE;
-      }
-      elsif ($opts{'r'})
-      {
-        $numberOfMatches++;
-        next;
-      }
-      else
-      {
-        ConvertEmailToMboxAndPrintIt($fileName,$email_header,
-          $email_body,$number_files,$line)
-            if $opts{'u'} && NotADuplicate($email_header) || !$opts{'u'};
-
-        next;
-      }
-    }
-
-    #----------------------------------------------------------------
-
-    dprint "Checking date constraint.";
-
-    $isMatch = 1;
-
-    {
-      my $matchesDate = CheckDate(\$email_header);
-      $isMatch = 0 if defined $opts{'d'} && !$matchesDate;
-
-      dprint "Email matches date constraint\n"
-        if defined $opts{'d'} && $matchesDate;
-      dprint "Email doesn't match date constraint\n"
-        if defined $opts{'d'} && !$matchesDate;
-    }
-
-    $isMatch = !$isMatch if $opts{'v'};
-
-    # If the match occurred in the right place...
-    if ($isMatch)
-    {
-      dprint "Email matches all patterns and constraints.";
-
-      if ($opts{'l'})
-      {
-        print "$fileName\n";
-
-        # We can return since we found at least one email that matches.
-        return $DONE;
-      }
-      elsif ($opts{'r'})
-      {
-        $numberOfMatches++;
-      }
-      else
-      {
-        ConvertEmailToMboxAndPrintIt($fileName,$email_header,
-          $email_body,$number_files,$line)
-            if $opts{'u'} && NotADuplicate($email_header) || !$opts{'u'};
-      }
-    }
-    else
-    {
-      dprint "Email did not match all patterns and constraints.";
-    }
   }
 
   print "$fileName: $numberOfMatches\n" if ($opts{'r'});
@@ -1588,33 +1842,19 @@ sub CheckDate($)
   # continuations.
   $header =~ s/\n\s+(\S)/ $1/g;
 
-  if ($opts{'a'} && ($header =~ /^Received:\s.*\;\s*(.*?)$/im))
-  {
-    dprint "Received date in email is: $1.";
-
-    $emailDate = str2time($1);
-
-    return IsInDate($emailDate,$dateRestriction,$date1,$date2) if defined $emailDate;
-    
-    warn "** Couldn't parse received date \"$1\". " .
-      "Assuming it doesn't match the date constraint **\n";
-    warn "  " . GetFromLine($header) . "\n"
-        if defined GetFromLine($header);
-    warn "  " . GetSubjectLine($header) . "\n"
-        if defined GetSubjectLine($header);
-
-    return 0;
-  }
-  elsif ($header =~ /^Date:\s*(.*)$/im)
+  if ( ($opts{'a'} && ($header =~ /^Received:\s.*\;\s*(.*?)$/im)) ||
+    $header =~ /^Date:\s*(.*)$/im ||
+    $header =~ /^From \S+\s+(.*)$/im)
   {
     dprint "Date in email is: $1.";
 
     $emailDate = str2time($1);
 
-    return IsInDate($emailDate,$dateRestriction,$date1,$date2) if defined $emailDate;
-
-    warn "** Couldn't parse sent date \"$1\". " .
-      "Assuming it doesn't match the date constraint:\n";
+    return IsInDate($emailDate,$dateRestriction,$date1,$date2)
+      if defined $emailDate;
+    
+    warn "** Couldn't parse email date \"$1\". " .
+      "Assuming it doesn't match the date constraint **\n";
     warn "  " . GetFromLine($header) . "\n"
         if defined GetFromLine($header);
     warn "  " . GetSubjectLine($header) . "\n"
@@ -1771,7 +2011,7 @@ sub IsInDate($$$$)
 sub usage
 {
 <<EOF;
-usage: grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+usage: grepmail [--help] [-abBDFhHilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
 EOF
 }
 
@@ -1788,19 +2028,24 @@ usage:
     [-X <signature-pattern>] [-Y <header-pattern>] <files...>
 
   grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <expr>] <files...>
+    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <pattern>] <files...>
 
-At least one of -s, -d, -u, and -e must be specified, and can appear in any
-relative order following the other flags. The -e flag is optional if expr
-appears immediately before -s or -d. Files can be plain ASCII or ASCII files
-compressed with gzip, tzip, or bzip2. If no file is provided, normal or
+  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
+    [-X <signature-pattern>] [-Y <header-pattern>] [-E <expr>] <files...>
+
+At least one of -s, -d, -u, -e, and -E must be specified, and can appear in
+any relative order following the other flags. The -e flag is optional if
+pattern appears immediately before -s or -d. Files can be plain ASCII or ASCII
+files compressed with gzip, tzip, or bzip2. -E allows for complex pattern
+matches involving logical operators. If no file is provided, normal or
 compressed ASCII input is taken from STDIN.
 
 -a Use received date instead of sent date for -d matching
 -b Search must match body
 -d Specify a date range (see below)
 -D Debug mode
--e Explicitly name expr (when searching for strings beginning with "-")
+-e Explicitly name pattern (when searching for strings beginning with "-")
+-E Specify a complex search expression
 -h Search must match header
 -H Print headers but not bodies of matching emails
 -i Ignore case in the search expression
@@ -1843,7 +2088,10 @@ grepmail - search mailboxes for mail matching a regular expression
     [-X <signature-pattern>] [-Y <header-pattern>] <files...>
 
   grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <expr>] <files...>
+    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <pattern>] <files...>
+
+  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
+    [-X <signature-pattern>] [-Y <header-pattern>] [-E <expr>] <files...>
 
 =head1 DESCRIPTION
 
@@ -1858,9 +2106,11 @@ When redirected to a file, the result is another mailbox, which can, in turn,
 be handled by standard User Agents, such as I<elm>, or even used as input for
 another instance of I<grepmail>.
 
-At least one of B<-e>, B<-d>, B<-s>, or B<-u> must be specified. The pattern
-is optional if B<-d>, B<-s>, and/or B<-u> is used. The B<-e> flag is optional
-if there is no file whose name is the pattern.
+At least one of B<-E>, B<-e>, B<-d>, B<-s>, or B<-u> must be specified. The
+pattern is optional if B<-d>, B<-s>, and/or B<-u> is used. The B<-e> flag is
+optional if there is no file whose name is the pattern. The B<-E> option can
+be used to specify complex search expressions involving logical operators.
+(See below.)
 
 If a mailbox can not be found, grepmail searches the $home/mail, $home/Mail,
 $home/Mailbox directories (or the directory specified by the MAIL environment
@@ -1897,8 +2147,7 @@ Use arrival date instead of sent date.
 
 =item B<-b>
 
-Asserts that the pattern must match in the body of the email. (Not compatible
-with B<-B>.)
+Asserts that the pattern must match in the body of the email. 
 
 =item B<-D>
 
@@ -1916,10 +2165,39 @@ grepmail will attempt to parse the date with Date::Manip, if the module is
 installed on the system. Use an empty pattern (i.e. B<-d "">) to find emails
 without a "Date: ..." line in the header.
 
+=item B<-E>
+
+Specify a complex search expression using logical operators. The current
+syntax allows the user to specify search expressions using Perl syntax. Three
+values can be used: $email (the entire email message), $email_header (just the
+header), or $email_body (just the body). A search is specified in the form
+"$email =~ /pattern/", and multiple searches can be combined using "&&" and
+"||" for "and" and "or".
+
+For example, the expression
+
+  $email_header =~ /^From: .*\@coppit.org/ && $email =~ /grepmail/i
+
+will find all emails which originate from coppit.org (you must escape the "@"
+sign with a backslash), and which contain the keyword "grepmail" anywhere in
+the message, in any capitalization.
+
+B<-E> is incompatible with B<-b>, B<-h>, and B<-e>. B<-i>, B<-M>, B<-S>, and
+B<-Y> have not yet been implemented.
+
+NOTE: The syntax of search expressions may change in the future. In
+particular, support for size, date, and other constraints may be added. The
+syntax may also be simplified in order to make expression formation easier to
+use (and perhaps at the expense of reduced functionality).
+
 =item B<-e>
 
 Explicitly specify the search pattern. This is useful for specifying patterns
 that begin with "-", which would otherwise be interpreted as a flag.
+
+=item B<-F>
+
+Force processing of ASCII files which don't appear to be mailboxes.
 
 =item B<-h>
 
@@ -2117,32 +2395,11 @@ found directly.
 
 Bug not squashed yet. Any info would be appreciated.
 
-=item File names with special characters cause problems.
-
-grepmail uses the shell to invoke the decompression filters. If the filename
-contains single quotes, ampersands, backslashes, etc, this can cause problems.
-This bug is not a high priority -- please send email if you really need it
-fixed.
-
-The fix is to fork the process, opening up a pipe to the child, which starts
-the filter process using the multiple argument form of exec (which doesn't
-invoke the shell).
-
 =item File names that look like flags cause problems.
 
 In some special circumstances, grepmail will be confused by files whose names
 look like flags. In such cases, use the B<-e> flag to specify the search
 pattern.
-
-=item Error messages when searching compressed files are wrong
-
-grepmail decompresses compressed files and re-invokes itself on them.
-As a result, any errors that occur while processing the uncompressed
-file will result in messages that do not reference the original
-compressed file. For example:
-
-  grepmail foo text_file.gz
-  ** Skipping non-mailbox ASCII file: 'text_file'
 
 =back
 

@@ -54,16 +54,16 @@ module was written to help speed up grepmail's mailbox processing.
 However, the Perl version has now "caught up" and is only about
 5% slower.
 EOF
-  print "=> [y] ";
+  print "=> [n] ";
   my $response = <STDIN>;
 
-  if ($response =~ /^n/i)
+  if ($response =~ /^y/i)
   {
-    push @args, 'FASTREADER=0';
+    push @args, 'FASTREADER=1';
   }
   else
   {
-    push @args, 'FASTREADER=1';
+    push @args, 'FASTREADER=0';
   }
 
   return @args;

@@ -1,3 +1,25 @@
+New in version 4.80:
+- Added prototype -E flag to support complex searches. (Thanks to Nelson Minar
+  <nelson@monkey.org> for the original suggestion in Sep 2000, And terry jones
+  <terry@eatoni.com> for seconding the idea.)
+- Added -F flag to force processing of files which grepmail determines are not
+  mailboxes. (feature suggested by terry jones <terry@eatoni.com>)
+- Documentation updated to reflect that -B no longer exists. (By terry jones
+  <terry@eatoni.com>)
+- The test to determine if a file is a mailbox was improved to adhere better
+  to RFC 822, while still providing some flexibility. (Initial suggestion and
+  patch by terry jones <terry@eatoni.com>)
+- Improved date extraction to also look at the 'From ' line when both the
+  Received and Date headers fail. (patch by terry jones <terry@eatoni.com>)
+- Fixed a long-standing bug in which filenames of compressed mailboxes which
+  contained special shell characters would cause problems. (Thanks to Jost
+  Krieger <jkrieger@users.sourceforge.net> for giving me the kick in the pants
+  to finally fix this.)
+- Fixed a long-standing bug in which grepmail would incorrectly report the
+  filename of compressed mailboxes in error messages. (Thanks to Jost Krieger
+  <jkrieger@users.sourceforge.net> for giving me the kick in the pants to
+  finally fix this.)
+
 New in version 4.72:
 - 20% speed improvement in the Perl mailbox parser (By terry jones
   <terry@eatoni.com>)
