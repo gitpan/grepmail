@@ -1,3 +1,12 @@
+New in version 3.9:
+- Took out specialization engine because there wasn't enough support to
+  program in that style.
+- Offering 2 main versions now -- Date::Manip and Date::Parse
+- Added -R option, which causes grepmail to recurse any directories
+  encountered. (Thanks to Emil Tiller <etiller@asc.corp.mot.com> for the
+  initial code.)
+- Fixed a small bug that would cause some attachments not to be identified.
+
 New in version 3.8:
 - Added a prototype engine to allow users to specialize grepmail at
   installation time. (See below)
