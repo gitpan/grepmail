@@ -4,16 +4,20 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date restrictions are supported.
 
+New in version 4.20:
+- grepmail development has been moved to SourceForge, and made public. Visit
+  http://grepmail.sourceforge.net/
+- Added -s flag, which limits matched emails to a given size
+- Restructured the code to be more robust with respect to feature interaction.
+  (At a 5-10% slowdown cost.)
+- Fixed an uninitialized variable warning caused emails without subjects in
+  debug mode.
+
 New in version 4.11:
 - Fixed a bug where an ASCII file would not be recognized as a mailbox when
   the first couple emails did not have a "From:" line. (Thanks to Jeff Flowers
   <jeff.flowers@npl.co.uk>)
 - Added standard Perl testing.
-
-New in version 4.1:
-- Stripped auto-perl execution code, since it never works on all platforms.
-  (Installation instructions modified to require the user to fix the #! line.)
-- Minor changes to allow grepmail to run without -w complaints.
 
 See the file CHANGES for a complete change history.
 
@@ -36,6 +40,12 @@ On Non-Windows systems:
 On Windows systems:
 - Just pick which one you like, and rename it to "grepmail"
 - Do "perldoc grepmail" for documentation
+
+
+HOMEPAGE
+
+Visit http://grepmail.sourceforge.net/ for the latest version, mailing lists,
+discussion forums, CVS access, and more.
 
 
 AUTHOR

@@ -45,6 +45,7 @@ my @tests = (
 'grepmail library no_such_file',
 'cat no_such_file 2>/dev/null | grepmail library',
 'grepmail -d "after armageddon" library t/mailarc-1.txt',
+'grepmail library -s 2000 t/mailarc-1.txt',
 );
 
 # Tests for certain supported options.

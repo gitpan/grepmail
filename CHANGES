@@ -1,3 +1,12 @@
+New in version 4.20:
+- grepmail development has been moved to SourceForge, and made public. Visit
+  http://grepmail.sourceforge.net/
+- Added -s flag, which limits matched emails to a given size
+- Restructured the code to be more robust with respect to feature interaction.
+  (At a 5-10% slowdown cost.)
+- Fixed an uninitialized variable warning caused emails without subjects in
+  debug mode.
+
 New in version 4.11:
 - Fixed a bug where an ASCII file would not be recognized as a mailbox when
   the first couple emails did not have a "From:" line. (Thanks to Jeff Flowers

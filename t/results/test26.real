@@ -1,6 +1,12 @@
-grepmail 4.11
+grepmail 4.2
 
-usage: grepmail [-bDhilmrRv] [[-e] <expr>] [-d "datespec"] <files...>
+usage: grepmail [-bDhilmrRv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+
+At least one of -s, -d, and -e must be specified, and can appear in any
+relative order following the other flags. The -e flag is optional if expr
+appears immediately before -s or -d. Files can be plain ASCII or ASCII files
+compressed with gzip, tzip, or bzip2. If no file is provided, normal or
+compressed ASCII input is taken from STDIN.
 
 -b Search must match body
 -d Specify a date range (see below)
@@ -16,6 +22,7 @@ usage: grepmail [-bDhilmrRv] [[-e] <expr>] [-d "datespec"] <files...>
 -r Output the names of the files and the number of emails matching the
    expression
 -R Recurse directories
+-s Restrict results to emails less than a certain size (in bytes)
 -v Output emails that don't match the expression
 
 Date specifications must be of the form of:
@@ -23,6 +30,3 @@ a date like "today", "05/18/93",
   "12:30 Dec 12th 1880", "8:00pm december tenth",
 OR "before", "after", or "since", followed by a date as defined above,
 OR "between <date> and <date>", where <date> is defined as above.
-
-Files can be plain ASCII or ASCII files compressed with gzip, tzip, or bzip2.
-You can also pipe normal or compressed ASCII to grepmail.
