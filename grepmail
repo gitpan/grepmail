@@ -1,6 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/cs/contrib/bin/perl -w
 
-# grepmail version 1.7
+# grepmail version 1.8
 
 # Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 # and returns those emails that match it. Piped input is allowed, and date
@@ -97,7 +97,8 @@ else
 if (@ARGV)
 {
   # For each input file...
-  foreach my $file (@ARGV)
+  my $file;
+  foreach $file (@ARGV)
   {
     # If it's not a gzipped file
     if ($file !~ /\.(gz|Z)$/)
@@ -194,9 +195,16 @@ $isInDate = 0;
 
 if ($opts{d})
 {
-  $email =~ /^Date:\s*(\S*\s*\S*\s*\S*\s*\S*\s*\S*)/m;
-  $emailDate = &ParseDate($1);
-  $isInDate = &IsInDate($emailDate,$daterestriction,$date1,$date2);
+  # The email might not have a date. In this case, print it out anyway.
+  if ($email =~ /^Date:\s*(\S*\s*\S*\s*\S*\s*\S*\s*\S*)/m)
+  {
+    $emailDate = &ParseDate($1);
+    $isInDate = &IsInDate($emailDate,$daterestriction,$date1,$date2);
+  }
+  else
+  {
+    $isInDate = 1;
+  }
 }
 else
 {
