@@ -1,7 +1,4 @@
-grepmail.DM                           grepmail using Date::Manip. (Slower but
-                                        more functional)
-grepmail.DP                           grepmail using Date::Manip. (Faster but
-                                        less functional)
+grepmail                              The main program
 README                                Read this first
 MANIFEST                              This file
 CHANGES                               A change history

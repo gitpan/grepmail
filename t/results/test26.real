@@ -1,33 +1,114 @@
-grepmail 4.31
+From jrh@jack.securepipe.com  Tue Jan 13 03:19:47 1998
+Received: from aleve.media.mit.edu by hub.media.mit.edu; (5.65v3.2/1.1/06Jun95-8.2MPM)
+	id AA08834; Tue, 13 Jan 1998 03:19:47 -0500
+Received: from splat.securepipe.com (splat.securepipe.com [169.207.51.74])
+	by aleve.media.mit.edu (8.8.7/ML970927) with SMTP id CAA00703
+	for <handyboard@media.mit.edu>; Tue, 13 Jan 1998 02:15:36 -0500 (EST)
+Message-Id: <199801130715.CAA00703@aleve.media.mit.edu>
+Received: (qmail 7615 invoked from network); 13 Jan 1998 07:23:07 -0000
+Received: from jack.securepipe.com (network-user@169.207.51.75)
+  by splat.securepipe.com with SMTP; 13 Jan 1998 07:23:07 -0000
+X-Mailer: exmh version 2.0zeta 7/24/97
+From: Joshua Heling <jrh@securepipe.com>
+To: handyboard@media.mit.edu
+Subject: questions re: unix version of IC
+Reply-To: Joshua Heling <jrh@securepipe.com>
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Date: Tue, 13 Jan 1998 01:23:12 -0600
+Sender: jrh@jack.securepipe.com
 
-usage: grepmail [-bDhilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+Hi -
 
-At least one of -s, -d, -u, and -e must be specified, and can appear in any
-relative order following the other flags. The -e flag is optional if expr
-appears immediately before -s or -d. Files can be plain ASCII or ASCII files
-compressed with gzip, tzip, or bzip2. If no file is provided, normal or
-compressed ASCII input is taken from STDIN.
+I'm a handy-board/ic newbie, so please excuse this question if it's answers 
+seem obvious.  After two weeks of writing code in DOS/Windows (yuck), I 
+downloaded the ic-2.860beta source code, which compiled without significant 
+trouble in linux (redhat 5).  The version is, of course, a bit different from 
+that which came with the handy-board (from Gleason Rsch, was version 2.851).
 
--b Search must match body
--d Specify a date range (see below)
--D Debug mode
--e Explicitely name expr (when searching for strings beginning with "-")
--h Search must match header
--i Ignore case in the search expression
--l Output the names of files having an email matching the expression
--M Do not search non-text mime attachments
--m Append "X-Mailfolder: <folder>" to all headers to indicate in which folder
-   the match occurred
--q Quiet mode -- don't output warnings
--r Output the names of the files and the number of emails matching the
-   expression
--R Recurse directories
--s Restrict results to emails less than a certain size (in bytes)
--u Ensure that no duplicate emails are output
--v Output emails that don't match the expression
+My question is, can I just copy the library files that came from Gleason Rsch. 
+into the lib directory on the unix ic installation (it seems that I can, I 
+just want to be sure)?  Are there any other issues I should be aware of 
+(w.r.t. the beta, or using ic from unix, end-of-line conventions on library 
+files, etc.).  I'm not particularly concerned with being able to download the 
+pcode in unix - I do have DOS easily available...
 
-Date specifications must be of the form of:
-a date like "today", "05/18/93",
-  "12:30 Dec 12th 1880", "8:00pm december tenth",
-OR "before", "after", or "since", followed by a date as defined above,
-OR "between <date> and <date>", where <date> is defined as above.
+BTW, thanks to all that have contributed to this really neat project - this is 
+my first exposure to robotics, and it's been great fun so far.
+
+
+- Joshua 
+
+--------
+Joshua Heling				             jrh@securepipe.com
+SecurePipe Communications, Inc.
+
+
+
+From fredm@ml.media.mit.edu  Tue Jan 13 10:41:57 1998
+Received: from aleve.media.mit.edu by hub.media.mit.edu; (5.65v3.2/1.1/06Jun95-8.2MPM)
+	id AA21129; Tue, 13 Jan 1998 10:41:57 -0500
+Received: from ml.media.mit.edu (ml.media.mit.edu [18.85.13.107])
+	by aleve.media.mit.edu (8.8.7/ML970927) with ESMTP id JAA22423
+	for <handyboard@media.mit.edu>; Tue, 13 Jan 1998 09:10:43 -0500 (EST)
+Received: from localhost (localhost [127.0.0.1])
+	by ml.media.mit.edu (8.8.7/8.8.7) with SMTP id JAA26699;
+	Tue, 13 Jan 1998 09:10:37 -0500 (EST)
+Message-Id: <199801131410.JAA26699@ml.media.mit.edu>
+X-Authentication-Warning: ml.media.mit.edu: localhost [127.0.0.1] didn't use HELO protocol
+To: Joshua Heling <jrh@securepipe.com>
+Cc: handyboard@media.mit.edu
+Subject: Re: questions re: unix version of IC 
+In-Reply-To: Your message of "Tue, 13 Jan 98 01:23:12 CST."
+             <199801130715.CAA00703@aleve.media.mit.edu> 
+Date: Tue, 13 Jan 98 09:10:37 -0500
+From: "Fred G. Martin" <fredm@media.mit.edu>
+X-Mts: smtp
+
+Joshua -
+
+There should be no problems using the Gleason Research libraries (or
+any of the libraries that are on the web site).  There are no differences
+between version 2.851 and 2.860 from the point of view of the
+libraries.
+
+There is a pre-compiled version for Linux.  See
+
+ftp://cher.media.mit.edu/pub/projects/interactive-c/unix/
+
+Fred
+
+
+In your message you said:
+> Hi -
+> 
+> I'm a handy-board/ic newbie, so please excuse this question if it's answers 
+> seem obvious.  After two weeks of writing code in DOS/Windows (yuck), I 
+> downloaded the ic-2.860beta source code, which compiled without significant 
+> trouble in linux (redhat 5).  The version is, of course, a bit different from
+ 
+> that which came with the handy-board (from Gleason Rsch, was version 2.851).
+> 
+> My question is, can I just copy the library files that came from Gleason Rsch
+. 
+> into the lib directory on the unix ic installation (it seems that I can, I 
+> just want to be sure)?  Are there any other issues I should be aware of 
+> (w.r.t. the beta, or using ic from unix, end-of-line conventions on library 
+> files, etc.).  I'm not particularly concerned with being able to download the
+ 
+> pcode in unix - I do have DOS easily available...
+> 
+> BTW, thanks to all that have contributed to this really neat project - this i
+s 
+> my first exposure to robotics, and it's been great fun so far.
+> 
+> 
+> - Joshua 
+> 
+> --------
+> Joshua Heling				             jrh@securepipe.com
+> SecurePipe Communications, Inc.
+> 
+> 
+> 
+

@@ -4,28 +4,17 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
+New in version 4.40:
+- Date::Parse and Date::Manip version unified -- Date::Parse is now required,
+  and Date::Manip (if present) is used to parse complex dates
+
 New in version 4.31:
 - Distro has missing test cases for -u functionality. Doh!
-
-New in version 4.30:
-- Updated code to avoid warnings under Perl 5.6
-- Fixed a bug in the test script where bzip2, gzip, and tzip support would
-  not be tested even though the programs were available.
-- Added standard --help flag
-- Added -u ("unique") flag, which ensures that no duplicate messages
-  will be output.
 
 See the file CHANGES for a complete change history and credits.
 
 
 INSTALLATION
-
-Two versions of grepmail are included in this distribution:
-- grepmail.DP uses Date::Parse, quick parsing engine.
-- grepmail.DM uses Date::Manip, a more flexible date parsing module that has
-  better error checking than Date::Parse, but which causes grepmail to run
-  about 60% slower. Date::Manip understands leap years and support date
-  specifications like "2nd Thursday in July".
 
 On Non-Windows systems:
   % perl Makefile.PL
@@ -38,8 +27,12 @@ are failing. Please email the output of running the particular test with the
 -D flag to the address below.
 
 On Windows systems:
-- Just pick which one you like, and rename it to "grepmail"
-- Do "perldoc grepmail" for documentation
+- Just copy "grepmail" to a place in your path
+
+
+DOCUMENTATION
+
+"perldoc grepmail"
 
 
 HOMEPAGE
@@ -48,7 +41,7 @@ Visit http://grepmail.sourceforge.net/ for the latest version, mailing lists,
 discussion forums, CVS access, and more.
 
 
-AUTHOR
+PRIMARY AUTHOR
 
 Written by David Coppit (david@coppit.org, http://coppit.org/)
 

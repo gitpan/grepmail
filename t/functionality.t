@@ -40,7 +40,6 @@ my @tests = (
 'grepmail -d "before July 15 1998" t/mailarc-1.txt',
 'grepmail library t/mailarc-2.txt.gz t/mailarc-1.txt',
 'grepmail -h',
-'grepmail -h',
 'cat t/mailarc-2.txt.tz | grepmail library',
 'grepmail library no_such_file',
 'cat no_such_file 2>/dev/null | grepmail library',
@@ -49,21 +48,22 @@ my @tests = (
 'grepmail library -u t/mailarc-1.txt',
 'grepmail -u t/mailarc-1.txt',
 'grepmail -bi imagecraft -u t/mailarc-1.txt',
+'grepmail -d "before 1st Tuesday in July 1998" t/mailarc-1.txt',
 );
 
 # Tests for certain supported options.
-my @date_parse = (23,25);
-my @date_manip = (26);
+my @date_manip = (34);
 my @bzip2 = (21,22);
 my @gzip = (16,17,18,20,24);
-my @tzip = (27);
-my @error_cases = (28,29,30);
+my @tzip = (26);
+my @error_cases = (27,28,29);
 
 my $version = GetVersion();
 
 my $bzip2 = 0;
 my $gzip = 0;
 my $tzip = 0;
+my $date_manip = 0;
 
 {
   my $temp;
@@ -85,6 +85,15 @@ my $tzip = 0;
   $tzip = 1 if $temp =~ /usage/;
 
   open STDERR,">&OLDSTDERR" or die "Can't restore STDOUT: $!\n";
+
+  if (ModuleInstalled("Date::Manip"))
+  {
+    $date_manip = 1;
+  }
+  else
+  {
+    $date_manip = 0;
+  }
 }
 
 print "Testing $version version of grepmail.\n";
@@ -168,14 +177,7 @@ sub CheckSkip
 {
   my $testNumber = shift;
 
-  if((grep {$_ == $testNumber} @date_parse) && $version eq 'Date::Parse')
-  {
-    print "Skipping test for Date::Parse version.\n";
-    skip(1,1);
-    return 1;
-  }
-
-  if((grep {$_ == $testNumber} @date_manip) && $version eq 'Date::Manip')
+  if((grep {$_ == $testNumber} @date_manip) && !$date_manip)
   {
     print "Skipping test for Date::Manip version\n";
     skip(1,1);
@@ -201,6 +203,21 @@ sub CheckSkip
     print "Skipping test using tzip\n";
     skip(1,1);
     return 1;
+  }
+
+  return 0;
+}
+
+sub ModuleInstalled
+{
+  my $module_name = shift;
+
+  $module_name =~ s/::/\//g;
+  $module_name .= '.pm';
+
+  foreach my $inc (@INC)
+  {
+    return 1 if -e "$inc/$module_name";
   }
 
   return 0;

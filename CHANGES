@@ -1,3 +1,8 @@
+New in version 4.40:
+- Date::Parse and Date::Manip version unified -- Date::Parse is now required,
+  and Date::Manip (if present) is used to parse complex dates. (Patch by
+  Seth Cohn <sethcohn@users.sourceforge.net>, modified by David Coppit)
+
 New in version 4.31:
 - Distro has missing test cases for -u functionality. Doh!
 
@@ -7,9 +12,9 @@ New in version 4.30:
 - Fixed a bug in the test script where bzip2, gzip, and tzip support would not
   be tested even though the programs were available. (Thanks to Andreas
   Kutschera <Andreas.Kutschera@bln.siemens.de> for the patch.)
-- Added standard --help flag (Patch by Seth Cohn <seth@oregonmed.net>)
+- Added standard --help flag (Patch by Seth Cohn <seth@users.sourceforge.net>)
 - Added -u ("unique") flag, which ensures that no duplicate messages will be
-  output. (A BIG thanks to Seth Cohn <seth@oregonmed.net>.)
+  output. (A BIG thanks to Seth Cohn <seth@users.sourceforge.net>.)
 
 New in version 4.23:
 - Updated the test cases to work better in timezones close to +0000 and +2300.
