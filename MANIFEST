@@ -10,7 +10,6 @@ FastReader/Changes                    FastReader changelog
 FastReader/MANIFEST                   FastReader MANIFEST
 FastReader/lib/Makefile.PL            FastReader lib Makefile.PL
 FastReader/lib/fastreader.c           FastReader main source file
-FastReader/lib/fastreader.h           FastReader main header file
 FastReader/lib/main.c                 FastReader C test program
 FastReader/t/simple.t                 FastReader Perl test program
 FastReader/t/mailarc-1.txt            FastReader input file

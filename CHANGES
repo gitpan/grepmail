@@ -1,8 +1,15 @@
-New in version 4.44:
+New in version 4.45:
+- Added -n and -V to usage message. (Thanks to Wolfgang Rohdewald
+  <WRohdewald@dplanet.ch> for catching this.)
+- Added workarounds to prevent warnings resulting from a bug in Perl 5.6
+- A blank line before the start of an email is not required now. This
+  allows broken folders created by Netscape to be read. (Thanks to Jeremy
+  Malcolm <terminus@terminus.net.au> for the bug report.)
 
+New in version 4.44:
 - execution with -M flag now 35% faster
 - Added a Mail::Folder::FastReader module which can cause grepmail to
-  run 10-20% faster, depending on your system. Since this module is
+  run 10-40% faster, depending on your system. Since this module is
   experimental, the installation script will allow you to not install
   the module. A C compiler is required.
 - "-----Original Message-----" now recognized as beginning an included

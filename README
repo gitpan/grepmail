@@ -4,10 +4,16 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
+New in version 4.45:
+- Added -n and -V to usage message.
+- Added workarounds to prevent warnings resulting from a bug in Perl 5.6
+- A blank line before the start of an email is not required now. This
+  allows broken folders created by Netscape to be read.
+
 New in version 4.44:
 - execution with -M flag now 35% faster
 - Added a Mail::Folder::FastReader module which can cause grepmail to
-  run 10-20% faster, depending on your system. Since this module is
+  run 10-50% faster, depending on your system. Since this module is
   experimental, the installation script will allow you to not install
   the module. A C compiler is required.
 - "-----Original Message-----" now recognized as beginning an included
@@ -30,10 +36,6 @@ New in version 4.44:
 - Fixed a bug in the handling of included messages.
 - Restructured code: localized reading of the emails from the file,
   removed two functions
-
-New in version 4.43:
-- Fixed a bug in -r counting when used with -h.
-- Fixed a bug in the handling of included messages.
 
 See the file CHANGES for a complete change history and credits.
 
@@ -71,7 +73,7 @@ INSTALLATION
 => On Non-Windows systems:
 
   % perl Makefile.PL
-  [Choose whether or not to use Maill::Folder::FastReader.]
+  [Choose whether or not to use Mail::Folder::FastReader.]
   % make
   % make test
   % make install
