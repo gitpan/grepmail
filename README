@@ -5,19 +5,16 @@ regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported, as are searches using
 logical operators.
 
-New in version 5.20:
-- Added speed testing to the distribution
-- Fixed Makefile.PL so that test modules would not be installed.
-- Changed testing to use PERLRUN instead of FULLPERLRUN, which is not
-  available with older versions of MakeMaker that ship with older versions of
-  Perl.
-- Fixed interactive installation problems.
-- Fixed broken searching of $HOME/mail, $HOME/Mail, and $HOME/Mailbox
-  directories when a mail folder can not be found. Changed $MAIL to $MAILDIR
-  since $MAIL usually points to the user's inbox. 
-- The user can now specify the cache file location with the -C flag.
-- Fixed compatibility problems with perl 5.005_01
-
+New in version 5.22:
+- X-Mailfolder header no longer has a line number when -n is used. (bugfix by
+  Kevin Pfeiffer <pfeiffer@iu-bremen.de>)
+- New -B flag prints abbreviated headers (initial patch by Kevin Pfeiffer
+  <pfeiffer@iu-bremen.de>)
+- Headers spanning multiple lines are now printed correctly in warnings and
+  such.
+- Fixed a spurious warning which would be printed if caching was not enabled.
+- grepmail will now disable caching if the caching version of
+  Mail::Mbox::MessageParser can not be loaded, instead of exiting.
 
 SOME NOTES
 
