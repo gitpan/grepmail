@@ -8,7 +8,7 @@ use vars qw($running_under_some_shell);         # no whining!
 
 require 5.003;
 
-# grepmail version 2.1
+# grepmail version 3.0
 
 # Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 # and returns those emails that match it. Piped input is allowed, and date
@@ -26,6 +26,9 @@ require 5.003;
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 3.0 -h and -b can be used together. Rewrote the ProcessMailFile to run 2 to
+#   3 times faster, and use less memory. Correctly diagnoses directories as
+#   such (by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>).
 # 2.1 Added -l,-r, and -e, as suggested by Reinhard Max <max@suse.de>. Now
 #   uses about 1/3 the memory, and is a little faster.
 # 2.0 Added POD documentation at the end of the script (thanks, Jeffrey
@@ -46,6 +49,22 @@ require 5.003;
 #   grepmail <pattern> file | grepmail <pattern>
 # 1.1 Support for dates.
 # 1.0 Initial version, with -v -i, and gzip support
+
+# Notes:
+# It turns out that -h, -b, and -v have some nasty feature interaction. Here's
+# a table of how matching should occur for each combination of flags:
+#
+#  B, H,!V
+#  Match if body and header matches
+#  B,!H,!V
+#  Match if body matches -- don't care about header
+# !B, H,!V
+#  Match if header matches -- don't care about body
+# -V strictly inverts each of the above cases.
+
+#  The best way to think about this is using Venn diagrams. (Especially when
+#  trying to figure out whether the header uniquely determines whether the
+#  email matches.
 
 use strict;
 use FileHandle;
@@ -150,9 +169,12 @@ if (@ARGV)
   my $file;
   foreach $file (@ARGV)
   {
-    # First of all, ignore empty files.
+    # First of all, silently ignore empty files...
     next if -z $file;
 
+    # ...and also ignore directories.
+    warn "** Skipping directory: '$file' **\n" and next if -d $file;
+  
     # If it's not a gzipped file
     if ($file !~ /\.(gz|Z)$/)
     {
@@ -193,14 +215,22 @@ else
     print TMP while <$fileHandle>;
     close TMP;
     $fileHandle->close()||die "Error writing $tempFile $!";
+
     $fileHandle->open($tempFile) || die "Can't open $tempFile $!";
     ProcessMailFile($fileHandle,"Gzip'd standard input");
     $fileHandle->close();
     unlink $tempFile;      
   }
-  # Otherwise process it directly
+  # Otherwise save it directly
   else
   {
+    my $tempFile = "/tmp/$$";
+    open(TMP,">$tempFile") || die "Can't create $tempFile $!";
+    print TMP while <$fileHandle>;
+    close TMP;
+    $fileHandle->close()||die "Error writing $tempFile $!";
+
+    $fileHandle->open($tempFile) || die "Can't open $tempFile $!";
     ProcessMailFile($fileHandle,"Standard input");
     $fileHandle->close();
   }
@@ -212,72 +242,191 @@ sub ProcessMailFile ($$)
 {
 my $fileHandle = shift @_;
 my $fileName = shift @_;
-my ($email,$header,$body,$found,$firstLine,$numberOfMatches);
+my ($numberOfMatches,$start,$matchesBody,$matchesHeader,$paragraph);
 
-$firstLine = 1;
-$email = "";
 $numberOfMatches = 0;
 
-while (<$fileHandle>)
+# Read whole paragraphs
+$/ = "\n\n";
+
+# This is the main loop. It's executed once for each email
+while (!eof($fileHandle))
 {
-  # Code modified from Mail::Util
-  if ((!$firstLine && /^From .*\d{4}/) || eof) 
+  # Read the header
+  $start = tell $fileHandle;
+  $paragraph = <$fileHandle>;
+
+  # Save the header for later when we check the date.
+  my $header = $paragraph;
+
+  my ($matchesHeader,$matchesBody); 
+
+  # See if the header matches the pattern
+  $matchesHeader = ($paragraph =~ /$pattern/om);
+
+  # At this point, we might know enough to print the email.
+  if (
+      ($opts{h} && $opts{b} && $opts{v} && !$matchesHeader) ||
+      ($opts{h} && !$opts{b} && $opts{v} && !$matchesHeader) ||
+      (!$opts{h} && !$opts{b} && !$opts{v} && $matchesHeader)
+     )
   {
-
-    if ($opts{b} || $opts{h})
+    # Skip to the next email if the date is wrong.
+    if (!&CheckDate(\$header))
     {
-      my $bodyIndex = index ($email, "\n\n");
+      SkipToNextEmail($fileHandle);
+      next;
+    }
 
-      $found = (substr($email,$bodyIndex+2) =~ /$pattern/o) if ($opts{b});
-      $found = (substr($email,0,$bodyIndex) =~ /$pattern/o) if ($opts{h});
+    if ($opts{l})
+    {
+      print "$fileName\n";;
+
+      # We can return since we found at least one email that matches.
+      return;
+    }
+    elsif ($opts{r})
+    {
+      $numberOfMatches++;
+      SkipToNextEmail($fileHandle);
     }
     else
     {
-      $found = ($email =~ /$pattern/o);
+      PrintEmail($fileHandle,$start);
     }
 
-    $found = !$found if ($opts{v});
+    next;
+  }
 
-    # Don't print the email if -l was given
-    if ($found && &CheckDate(\$email))
+  # We might have enough information to abort early
+  if (
+      ($opts{h} && $opts{b} && !$opts{v} && !$matchesHeader) ||
+      ($opts{h} && !$opts{b} && !$opts{v} && !$matchesHeader) ||
+      ($opts{h} && !$opts{b} && $opts{v} && !$matchesHeader) ||
+      (!$opts{h} && !$opts{b} && $opts{v} && $matchesHeader)
+     )
+  {
+    do
     {
-      if ($opts{l})
-      {
-        print "$fileName\n";
-
-        # We can return since we found at least one email that matches.
-        return;
-      }
-      elsif ($opts{r})
-      {
-        $numberOfMatches++;
-      }
-      else
-      {
-        print $email;
-      }
+      $paragraph = <$fileHandle>;
     }
+    while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
 
-    $email = $_;
-    $found = 0;
+    # Back up if we went too far
+    seek ($fileHandle, -(length $paragraph), 1) if (!eof);
+
+    next;
+  }
+
+  # Now search the body for the pattern
+  do
+  {
+    $paragraph = <$fileHandle>;
+  }
+  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/) &&
+        ($paragraph !~ /$pattern/om));
+
+  if (eof)
+  {
+    $matchesBody = 0;
+  }
+  elsif ($paragraph =~ /^\n*From .*\d{4}/)
+  {
+    seek ($fileHandle, -(length $paragraph), 1);
+    $matchesBody = 0;
   }
   else
   {
-    $firstLine = 0;
-    $email .= $_;
+    $matchesBody = ($paragraph =~ /$pattern/om);
   }
+
+  my $isMatch = (
+                 ($opts{b} && $opts{h} && $matchesBody && $matchesHeader) ||
+                 ($opts{b} && !$opts{h} && $matchesBody) ||
+                 (!$opts{b} && $opts{h} && $matchesHeader) ||
+                 (!$opts{b} && !$opts{h} && ($matchesBody || $matchesHeader))
+                );
+
+  $isMatch = !$isMatch if $opts{v};
+
+  # If the match occurred in the right place...
+  if ($isMatch)
+  {
+    # Skip to the next email if the date is wrong.
+    if (!&CheckDate(\$header))
+    {
+      SkipToNextEmail($fileHandle);
+      next;
+    }
+
+    if ($opts{l})
+    {
+      print "$fileName\n";
+
+      # We can return since we found at least one email that matches.
+      return;
+    }
+    elsif ($opts{r})
+    {
+      $numberOfMatches++;
+      SkipToNextEmail($fileHandle);
+    }
+    else
+    {
+      PrintEmail($fileHandle,$start);
+    }
+  }
+  else
+  {
+    # It doesn't match the pattern
+    SkipToNextEmail($fileHandle);
+  }
+
 }
 
-if ($opts{r})
-{
- print "$fileName: $numberOfMatches\n";
+ print "$fileName: $numberOfMatches\n" if ($opts{r});
 }
-
-}
-
 
 #-------------------------------------------------------------------------------
 
+sub SkipToNextEmail($)
+{
+  my $fileHandle = shift;
+  my $paragraph;
+
+  do
+  {
+    $paragraph = <$fileHandle>;
+  }
+  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
+
+  # Back up if we went too far
+  seek ($fileHandle, -(length $paragraph), 1) if (!eof);
+}
+
+#-------------------------------------------------------------------------------
+
+sub PrintEmail($$)
+{
+  my $fileHandle = shift;
+  my $start = shift;
+  my $paragraph;
+
+  seek ($fileHandle, $start, 0);
+  $paragraph = <$fileHandle>;
+  do
+  {
+    print $paragraph;
+    $paragraph = <$fileHandle>;
+  }
+  while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
+
+  # Back up if we went too far
+  seek ($fileHandle, -(length $paragraph), 1) if (!eof);
+}
+
+#-------------------------------------------------------------------------------
+    
 sub CheckDate($)
 {
 my $emailref = shift;
@@ -485,21 +634,23 @@ Many of the options and arguments are analogous to those of grep.
 
 The pattern to search for in the mail message.  May be any Perl regular
 expression, but should be quoted on the command line to protect against
-globbing (shell expansion).
+globbing (shell expansion). To search for more than one pattern, use the form
+"(pattern1|pattern2|...)".
 
 =item B<mailbox>
 
 Mailboxes must be traditional, UNIX C</bin/mail> mailbox format.  The
 mailboxes may be zipped by gzip, in which case zcat must be installed on the
-system.  If no mailbox is specified, takes input from stdin.
+system.  If no mailbox is specified, takes input from stdin, which can be
+gzip'd or not.
 
 =item B<-b>
 
-Look only in the bodies of mail messages.
+Places the assertion that the pattern must match in the body of the email.
 
 =item B<-h>
 
-Look only in the headers of mail messages.
+Places the assertion that the pattern must match in the header of the email.
 
 =item B<-i>
 
@@ -507,7 +658,9 @@ Make the search case-insensitive (by analogy to I<grep -i>).
 
 =item B<-v>
 
-Invert the sense of the search, (by analogy to I<grep -v>).
+Invert the sense of the search, (by analogy to I<grep -v>). Note that this
+affects only -h and -b, not -d. This results in the set of emails printed
+being the complement of those that would be printed without the -v switch.
 
 =item B<-l>
 
@@ -549,13 +702,19 @@ job, ignoring case:
 
   grepmail "(research|job)" -i -d "since 8/20/98" -v saved-mail
 
-Get all email about mime but not about Netscape:
+Get all email about mime but not about Netscape. Constrain the search to match
+the body, since most headers contain the text "mime":
 
   grepmail mime -b saved-mail | grepmail Netscape -v
 
-Print a list of all mailboxes containing a message from Rodney:
+Print a list of all mailboxes containing a message from Rodney. Constrain the
+search to the headers, since quoted emails may match the pattern:
 
   grepmail "^From.*Rodney" -h -l saved-mail*
+
+Find all emails with the text "Pilot" in both the header and the body:
+
+  grepmail "Pilot" -h -b saved-mail*
 
 Print a count of the number of messages about grepmail in all saved-mail
 mailboxes:
