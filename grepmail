@@ -1,4 +1,4 @@
-#!/usr/cs/bin/perl -w
+#!/usr/bin/perl -w
 
 # use perl                                  -*- mode: Perl; -*-
 eval 'exec perl -S $0 "$@"'
@@ -8,7 +8,7 @@ use vars qw($running_under_some_shell);         # no whining!
 
 require 5.003;
 
-# grepmail version 3.1
+# grepmail version 3.2
 
 # Grepmail searches a normal or gzipped mailbox for a given regular expression
 # and returns those emails that match the query. It also supports piped input,
@@ -20,12 +20,20 @@ require 5.003;
 # Written by David Coppit (coppit@cs.virginia.edu,
 #  http://www.cs.virginia.edu/~dwc3q/index.html)
 
-# Please send me any modifications you make. (for the better, that is. :)
+# Please send me any modifications you make. (for the better, that is. :) I
+# have a suite of tests that I can give you if you ask. Keep in mind that I'm
+# likely to turn down obscure features to avoid including everything but the
+# kitchen sink.
 
 # This code is distributed under the GNU General Public License (GPL). See
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
 # Version History (major changes only)
+# 3.2 Added TMPFILE environment variable support, and a signal handler (thanks
+#   to Ulli Horlacher (<framstag@moep.bb.bawue.de>). Fixed a bug where the
+#   last paragraph of the last email in a mailbox would not be printed on
+#   Linux. (How's that for obscure? Thanks to Eli Criffield
+#   <rexracer@mammoth.org> for discovering it.)
 # 3.1 Added -m, which prints the folder name in which the email was found as
 #   an "X-Mailfolder" addition to the header (by Ulli Horlacher
 #   <framstag@moep.bb.bawue.de>). Improved error checking on flags. Changed
@@ -105,10 +113,31 @@ EOF
 
 #-------------------------------------------------------------------------------
 
+sub cleanExit
+{
+  if (defined $MAIN::mbox)
+  {
+    unlink $MAIN::mbox;
+  }
+
+  if (defined $MAIN::tempFile)
+  {
+    unlink $MAIN::tempFile;
+  }
+
+  print "Cancelled.\n";
+
+  exit;
+}
+
+#-------------------------------------------------------------------------------
+
 my (%opts, $pattern, $unzipMethod);
 
 BEGIN
 {
+print @INC;
+
   $pattern = "";
 
   # Print usage error if no arguments given
@@ -175,6 +204,21 @@ else
 #print "FILES: @ARGV\n";
 #exit;
 
+$SIG{HUP} =  \&cleanExit;
+$SIG{INT} =  \&cleanExit;
+$SIG{QUIT} = \&cleanExit;
+$SIG{TERM} = \&cleanExit;
+
+my $tempDir;
+if (defined $ENV{TMPDIR})
+{
+  $tempDir = $ENV{TMPDIR};
+}
+else
+{
+  $tempDir = "/tmp";
+}
+
 # If the user provided input files...
 if (@ARGV)
 {
@@ -200,7 +244,7 @@ if (@ARGV)
     # If it is a gzipped file
     else
     {
-      my $tempFile = "/tmp/$$";
+      my $tempFile = "$tempDir/$$";
       `gunzip -c $file > $tempFile`;
       my $fileHandle = new FileHandle;
       $fileHandle->open($tempFile)
@@ -222,7 +266,7 @@ else
   if (-B $fileHandle)
   {
     binmode $fileHandle;
-    my $tempFile = "/tmp/$$";
+    my $tempFile = "$tempDir/grepmail.$$";
     open(TMP,"|gunzip -c >$tempFile") || die "Can't create $tempFile $!";
     binmode TMP;
     print TMP while <$fileHandle>;
@@ -237,7 +281,7 @@ else
   # Otherwise save it directly
   else
   {
-    my $tempFile = "/tmp/$$";
+    my $tempFile = "/tmp/grepmail.$$";
     open(TMP,">$tempFile") || die "Can't create $tempFile $!";
     print TMP while <$fileHandle>;
     close TMP;
@@ -293,7 +337,7 @@ while (!eof($fileHandle))
 
     if ($opts{l})
     {
-      print "$fileName\n";;
+      print "$fileName\n";
 
       # We can return since we found at least one email that matches.
       return;
@@ -435,11 +479,12 @@ sub PrintEmail($$$)
     chop $paragraph;
     $paragraph .= "X-Mailfolder: $fileName\n\n";
   }
+  print $paragraph;
 
   do
   {
-    print $paragraph;
     $paragraph = <$fileHandle>;
+    print $paragraph if ($paragraph !~ /^\n*From .*\d{4}/);
   }
   while (!eof && ($paragraph !~ /^\n*From .*\d{4}/)) ;
 
@@ -626,7 +671,7 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [-e <regex>] [-vihblrm] [-d "datespec"] [mailbox ...]
+  grepmail [-e <regex>] [-vihblr] [-d "datespec"] [mailbox ...]
 
 =head1 DESCRIPTION
 

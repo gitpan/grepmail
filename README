@@ -1,10 +1,14 @@
-grepmail version 3.1
+grepmail version 3.2
 
 Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 and returns those emails that match it. Piped input is allowed, and date
 restrictions are supported.
 
-New in this version: Modified the decompression to be more compatible with
+New in version 3.2: Added TMPFILE environment variable support, and a signal
+handler. Fixed a bug where the last paragraph of the last email in a mailbox
+would not be printed on Linux.
+
+New in version 3.1: Modified the decompression to be more compatible with
 older versions of gzip. Improved error checking so that "grepmail -h" prints a
 usage message. Added -m flag, which causes an "X-Mailfolder" line to be added
 to the header, thereby showing which folder contained the message.
@@ -13,7 +17,9 @@ Written by David Coppit (coppit@cs.virginia.edu,
   http://www.cs.virginia.edu/~dwc3q/index.html)
 
 Please send me any modifications you make. (for the better, that is. :) I have
-a suite of tests that I can give you if you ask.
+a suite of tests that I can give you if you ask. Keep in mind that I'm likely
+to turn down obscure features to avoid including everything but the kitchen
+sink.
 
 This code is distributed under the GNU General Public License (GPL). See
 http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
