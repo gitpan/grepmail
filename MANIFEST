@@ -3,6 +3,17 @@ README                                Read this first
 MANIFEST                              This file
 CHANGES                               A change history
 Makefile.PL                           Makes the makefile
+FastReader/Makefile.PL                FastReader Makefile.PL
+FastReader/FastReader.pm              FastReader stub .pm file
+FastReader/FastReader.xs              FastReader Perl <=> C glue code
+FastReader/Changes                    FastReader changelog
+FastReader/MANIFEST                   FastReader MANIFEST
+FastReader/lib/Makefile.PL            FastReader lib Makefile.PL
+FastReader/lib/fastreader.c           FastReader main source file
+FastReader/lib/fastreader.h           FastReader main header file
+FastReader/lib/main.c                 FastReader C test program
+FastReader/t/simple.t                 FastReader Perl test program
+FastReader/t/mailarc-1.txt            FastReader input file
 t/functionality.t                     A test of the script's correctness
 t/mailarc-1.txt                       Input file
 t/mailarc-2.txt                       Input file
@@ -83,3 +94,9 @@ t/results/test36.stdout.real          Correct STDOUT output file
 t/results/test36.stderr.real          Correct STDERR output file
 t/results/test37.stdout.real          Correct STDOUT output file
 t/results/test37.stderr.real          Correct STDERR output file
+t/results/test38.stdout.real          Correct STDOUT output file
+t/results/test38.stderr.real          Correct STDERR output file
+t/results/test39.stdout.real          Correct STDOUT output file
+t/results/test39.stderr.real          Correct STDERR output file
+t/results/test40.stdout.real          Correct STDOUT output file
+t/results/test40.stderr.real          Correct STDERR output file

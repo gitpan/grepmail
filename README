@@ -4,32 +4,52 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
+New in version 4.44:
+- execution with -M flag now 35% faster
+- Added a Mail::Folder::FastReader module which can cause grepmail to
+  run 10-20% faster, depending on your system. Since this module is
+  experimental, the installation script will allow you to not install
+  the module. A C compiler is required.
+- "-----Original Message-----" now recognized as beginning an included
+  message
+- Fixed a bug where errors would not be displayed if compressed data
+  was piped to grepmail
+- Date::Parse is now only required if -d is used. (Date::Manip is
+  still only required if you use complex date specfications.)
+- Added -n flag to print line numbers a la grep
+- Fixed a bug in debug output where the email subject was actually the
+  sender
+- Fixed an undefined value in the printing of flag information
+- An ASCII file is now determined to be a mailbox if it has a line
+  whose prefix is 'From' or 'X-From-Line:', and another line whose
+  prefix is 'Received ', 'Date:', 'Subject:', 'X-Status:', or
+  'Status:'.
+- Error exits now return 1
+- -V flag prints the version
+- Fixed a bug in -r counting when used with -h.
+- Fixed a bug in the handling of included messages.
+- Restructured code: localized reading of the emails from the file,
+  removed two functions
+
 New in version 4.43:
 - Fixed a bug in -r counting when used with -h.
 - Fixed a bug in the handling of included messages.
-
-New in version 4.42:
-- Added -a flag to use received date instead of sent date for -d matches.
-- Included emails are now ignored properly
-- If an email has no date, the -d switch now issues a warning and does not
-  treat the email as a match
-- -d "" can be used to find emails without dates
-- Mailbox files are now detected as files using 
-  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Subject: /im)
-  rather than
-  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Date: /im)
-- Improved detection of binary files
-- STDERR and STDOUT now checked separately during "make test"
-- Headers can now be in the format "Date:<tab>" in addition to "Date: "
 
 See the file CHANGES for a complete change history and credits.
 
 
 MODULE DEPENDENCIES
 
-grepmail requires the Date::Parse module. If the user wants to use more
-complex date specifications with the -d flag, then Date::Manip should be
-installed as well.
+grepmail, by itself, can search mailboxes based on regular expression
+patterns. However, if you want to search based on date, the
+Date::Parse module is required. If you want to use more complex date
+specifications, then Date::Manip should be installed as well.
+
+Starting with version 4.44, an addtional module is distributed with
+grepmail, called Mail::Folder::FastReader. It implements the email
+reading capability in C for 10-20% faster execution, depending on your
+system. This module is compiled and installed during the installation
+of grepmail. (See below)
 
 The Date::Parse module is part of the TimeDate distribution, which can be
 downloaded from:
@@ -48,19 +68,27 @@ Alternatively, installation can be done automatically using the CPAN module:
 
 INSTALLATION
 
-On Non-Windows systems:
+=> On Non-Windows systems:
+
   % perl Makefile.PL
+  [Choose whether or not to use Maill::Folder::FastReader.]
   % make
   % make test
   % make install
 
-If make test fails, please run "perl t/functionality.t" and see which test(s)
-are failing. Please email the output of running the particular test with the
--D flag (e.g.:
+If make test fails, please run
+
+  make testfunc
+
+and see which test(s) are failing. Please email the output of running
+the particular test with the -D flag (e.g.:
+
   blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt
+
 to the address below.
 
-On Windows systems:
+=> On Windows systems:
+
 - Just copy "grepmail" to a place in your path
 
 

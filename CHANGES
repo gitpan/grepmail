@@ -1,3 +1,33 @@
+New in version 4.44:
+
+- execution with -M flag now 35% faster
+- Added a Mail::Folder::FastReader module which can cause grepmail to
+  run 10-20% faster, depending on your system. Since this module is
+  experimental, the installation script will allow you to not install
+  the module. A C compiler is required.
+- "-----Original Message-----" now recognized as beginning an included
+  message
+- Fixed a bug where errors would not be displayed if compressed data
+  was piped to grepmail
+- Date::Parse is now only required if -d is used. (Date::Manip is
+  still only required if you use complex date specfications.) (Thanks
+  to Richard Stallman <rms@gnu.org> for pointing this out.)
+- Added -n flag to print line numbers a la grep. (Thanks to Richard
+  Stallman <rms@gnu.org> for the suggestion)
+- Fixed a bug in debug output where the email subject was actually the
+  sender
+- Fixed an undefined value in the printing of flag information
+- An ASCII file is now determined to be a mailbox if it has a line
+  whose prefix is 'From' or 'X-From-Line:', and another line whose
+  prefix is 'Received ', 'Date:', 'Subject:', 'X-Status:', or
+  'Status:'.
+- Error exits now return 1 (Thanks to Wolfgang Rohdewald
+  <WRohdewald@dplanet.ch> for the bug report)
+- -V flag prints the version (Thanks to Wolfgang Rohdewald
+  <WRohdewald@dplanet.ch> for the feature request)
+- Restructured code: localized reading of the emails from the file,
+  removed two functions
+
 New in version 4.43:
 - Fixed a bug in -r counting when used with -h. (Thanks to Andrew
   <andrew@ugh.net.au> for the bug report.)

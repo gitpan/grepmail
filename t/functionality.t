@@ -39,7 +39,7 @@ my @tests = (
 'grepmail -v library t/mailarc-2.txt.bz2',
 'grepmail -d "before July 15 1998" t/mailarc-1.txt',
 'grepmail library t/mailarc-2.txt.gz t/mailarc-1.txt',
-'grepmail -h',
+'grepmail --help',
 'cat t/mailarc-2.txt.tz | grepmail library',
 'grepmail library no_such_file',
 'cat no_such_file 2>/dev/null | grepmail library',
@@ -52,6 +52,9 @@ my @tests = (
 'grepmail -d "before 7/15/1998" t/mailarc-2.txt',
 'grepmail -d "" t/mailarc-2.txt',
 'grepmail -ad "before 7/15/1998" t/mailarc-1.txt',
+'grepmail -n library t/mailarc-1.txt',
+'grepmail -n library t/mailarc-1.txt t/mailarc-2.txt',
+'grepmail "From.*luikeith@egr.msu.edu" t/mailarc-1.txt'
 );
 
 # Tests for certain supported options.
@@ -75,7 +78,7 @@ my $date_manip = 0;
   # test script from emitting a warning if the backticks can't find the
   # compression programs
   use vars qw(*OLDSTDERR);
-  open OLDSTDERR,">&STDERR" or die "Can't save STDOUT: $!\n";
+  open OLDSTDERR,">&STDERR" or die "Can't save STDERR: $!\n";
   open STDERR,">/dev/null" or die "Can't redirect STDERR to /dev/null: $!\n";
 
   $temp = `bzip2 -h 2>&1`;
@@ -108,7 +111,12 @@ print "\n";
 my $testNumber = 1;
 foreach my $test (@tests)
 {
-  $test =~ s#grepmail#blib/script/grepmail#sg;
+  ok(1),next if defined $ARGV[0] && $testNumber < $ARGV[0];
+
+  local $" = " -I";
+  my $includes = "-I@INC";
+
+  $test =~ s#grepmail#perl $includes blib/script/grepmail#sg;
   print "$test\n";
 
   next if CheckSkip($testNumber);
@@ -223,7 +231,10 @@ sub DoDiff
   my $diffstring = "diff t/results/test$testNumber.$resultType " .
     "t/results/test$testNumber.$resultType.real";
 
-  system "$diffstring > t/results/test$testNumber.$resultType.diff ".
+  system "echo $diffstring > t/results/test$testNumber.$resultType.diff ".
+    "2>t/results/test$testNumber.$resultType.diff.error";
+
+  system "$diffstring >> t/results/test$testNumber.$resultType.diff ".
     "2>t/results/test$testNumber.$resultType.diff.error";
 
   open DIFF_ERR, "t/results/test$testNumber.$resultType.diff.error";
@@ -244,9 +255,9 @@ sub DoDiff
     return (0,undef);
   }
 
-  my $numdiffs = `cat t/results/test$testNumber.$resultType.diff | wc -l`;
-  $numdiffs =~ s/[\n ]//g;
-  $numdiffs = $numdiffs/2;
+  my @diffs = `cat t/results/test$testNumber.$resultType.diff`;
+  shift @diffs;
+  my $numdiffs = ($#diffs + 1) / 2;
 
   if ($numdiffs != 0)
   {

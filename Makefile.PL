@@ -9,15 +9,45 @@ require 5.004;
 
 # --------------------------------------------------------------------------
 
-WriteMakefile(
+my %makefile_attributes=(
   # For debugging
   #'NOECHO' => '',
   'NAME'  => 'grepmail',
-  # finds $VERSION
   'VERSION_FROM' => 'grepmail',
-  #'VERSION' => $VERSION,
 
   'dist'  => { COMPRESS => 'gzip -9', SUFFIX => 'gz' },
   'EXE_FILES' => ['grepmail'],
   'PREREQ_PM' => {'Date::Parse' => 0},
 );
+
+unless (@ARGV)
+{
+  print <<EOF;
+Do you want to install the Mail::Folder::FastReader module? This
+module was written to help speed up grepmail's mailbox processing. It
+can speed things up by 10-20% (y/n)
+EOF
+  my $response = <STDIN>;
+
+  if ($response =~ /^n/i)
+  {
+    $makefile_attributes{'DIR'} = [];
+  }
+}
+
+sub MY::postamble
+{
+# Add a target for testing the speed, and one for testing
+# functionality
+'
+testspeed :: pure_all
+	PERL_DL_NONLAZY=1 $(FULLPERL) -I$(INST_ARCHLIB) -I$(INST_LIB) \
+	  -I$(PERL_ARCHLIB) -I$(PERL_LIB) $(TEST_FILE)
+
+testfunc :: pure_all
+	PERL_DL_NONLAZY=1 $(FULLPERL) -I$(INST_ARCHLIB) -I$(INST_LIB) \
+	  -I$(PERL_ARCHLIB) -I$(PERL_LIB) t/functionality.t
+';
+}
+
+WriteMakefile( %makefile_attributes );
