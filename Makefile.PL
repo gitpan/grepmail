@@ -6,43 +6,47 @@ use ExtUtils::MakeMaker;
 
 require 5.004;
 
-die "You don't need to specify options on the command line.\n"
-  if $ARGV[0] =~ /^\w+=/;
+# This is so that we can leave FASTREADER on the command line. We want to do
+# this so that an automatic regeneration of the Makefile (say, if Makefile.PL
+# gets changed) won't prompt the user again.
+$ExtUtils::MakeMaker::Recognized_Att_Keys{'FASTREADER'} = 1;
 
-my $use_fastreader = 1;
+@ARGV = Set_Install_Options(@ARGV);
 
-unless (@ARGV)
-{
-  $use_fastreader = Setup_Install();
-}
-
-my %makefile_attributes = Compute_Makefile_Attributes($use_fastreader);
+my %makefile_attributes = Compute_Makefile_Attributes(@ARGV);
 
 WriteMakefile( %makefile_attributes );
 
 # --------------------------------------------------------------------------
 
-sub Setup_Install
+sub Set_Install_Options
 {
-  my $VERSION = shift;
+  my @args = @_;
 
-  my ($install_type,$use_fastreader,$prefix) =
-      Get_Unix_Install_Info();
+  my $printed = 0;
 
-  unless ($install_type eq 'system')
+  unless (grep {/^FASTREADER=/} @args)
   {
-    push @ARGV,'INSTALLDIRS=site';
-    push @ARGV,"PREFIX=$prefix";
+    $printed = 1;
+    @args = Set_FastReader_Interactively(@args);
   }
 
-  return $use_fastreader;
+  unless ((grep {/^PREFIX=/} @args) || (grep {/^INSTALLDIRS=/} @args))
+  {
+    print "\n","-"x78,"\n\n" if $printed;
+
+    $printed = 1;
+    @args = Set_Installation_Type_Interactively(@args);
+  }
+
+  return @args;
 }
 
 # --------------------------------------------------------------------------
 
-sub Get_Unix_Install_Info
+sub Set_FastReader_Interactively
 {
-  my $response;
+  my @args = @_;
 
   print <<EOF;
 Do you want to install the Mail::Folder::FastReader module? This
@@ -50,21 +54,26 @@ module was written to help speed up grepmail's mailbox processing. It
 can speed things up by 10-20%
 EOF
   print "=> [y] ";
-  $response = <STDIN>;
-
-  my $use_fastreader;
+  my $response = <STDIN>;
 
   if ($response =~ /^n/i)
   {
-    $use_fastreader = 0;
+    push @args, 'FASTREADER=0';
   }
   else
   {
-    $use_fastreader = 1;
+    push @args, 'FASTREADER=1';
   }
 
+  return @args;
+}
 
-  print "\n","-"x78,"\n";
+# --------------------------------------------------------------------------
+
+sub Set_Installation_Type_Interactively
+{
+  my @args = @_;
+
   print <<EOF;
 Choose your installation type:
 [1] normal Perl locations
@@ -72,26 +81,33 @@ Choose your installation type:
 EOF
 
   print "=> [1] ";
-  $response = <STDIN>;
+  my $response = <STDIN>;
   chomp $response;
   $response = '1' if $response eq '';
 
 
-  return ('system',$use_fastreader,undef) if $response eq '1';
+  if ($response eq '1')
+  {
+    push @args, 'INSTALLDIRS=perl';
+  }
+  else
+  {
 
+    my $home = Get_Home_Directory();
 
-  my $home = Get_Home_Directory();
+    print "\n","-"x78,"\n\n";
 
-  print "\n","-"x78,"\n";
-  print "Where PREFIX should I use?\n";
-  print "=> [$home] ";
+    print "What PREFIX should I use?\n";
+    print "=> [$home] ";
 
-  my $prefix = <STDIN>;
-  chomp $prefix;
-  $prefix = $home if $prefix eq '';
+    my $prefix = <STDIN>;
+    chomp $prefix;
+    $prefix = $home if $prefix eq '';
 
+    push @args,"PREFIX=$prefix";
+  }
 
-  return ('user',$use_fastreader,$prefix);
+  return @args;
 }
 
 # --------------------------------------------------------------------------
@@ -117,7 +133,7 @@ home directory using both getpwuid and your HOME environment variable.
 
 sub Compute_Makefile_Attributes
 {
-  my $use_fastreader = shift;
+  my @args = @_;
 
   my %makefile_attributes = (
     'NAME'  => 'grepmail',
@@ -130,7 +146,7 @@ sub Compute_Makefile_Attributes
     'PREREQ_PM' => { 'Date::Parse' => 0},
   );
 
-  $makefile_attributes{'DIR'} = [] unless $use_fastreader;
+  $makefile_attributes{'DIR'} = [] unless grep {/^FASTREADER=1$/} @args;
 
   return %makefile_attributes;
 }

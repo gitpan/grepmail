@@ -1,3 +1,18 @@
+New in version 4.60:
+- Removed -B flag and added -S flag. -B is now performed using -bS.
+- Added installation flags to suppress interactive installation. (Thanks to
+  Joey Hess <joey@kitenet.net> for the problem report. He had to patch
+  Makefile.PL for his Debian packaging.)
+- Fixed a slow implementation of searching for signatures that would cause
+  grepmail to crawl for very large emails. Thanks to Joey Hess
+  <joey@kitenet.net> for discovering the inefficiency.
+- Fixed a short-circuit which should have bypassed the search for signatures
+  if -B was not specified. Thanks to Joey Hess <joey@kitenet.net> for finding
+  the bug.
+- Implemented a new Perl parser which is 5% to 50% faster depending on how
+  I/O-bound your system is.
+- Restructured the code a bit and improved detection of invalid arguments.
+
 New in version 4.51:
 - grepmail now dies gracefully when invalid patterns like 'strcpy(' are
   supplied. (It should be 'strcpy\('.)

@@ -4,28 +4,20 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.51:
-- Fixed a bug in attachment boundary matching which would cause the boundary
-  match to fail if the boundary contained special pattern matching characters.
-  (Thanks to Richard Everson for identifying the bug, and providing a sample
-  email which demonstrates the problem.)
-- Fixed a bug where grepmail would fail to print matching emails which had
-  signatures, and added a test case for it. This bug was introduced with -B
-  support in version 4.49.  (A *huge* thanks to Moritz Barsnick for reporting
-  the bug and doing the initial analysis of the cause.)
-- grepmail now dies gracefully when invalid patterns like "strcpy(" are
-  supplied. (It should be "strcpy\(".)
-- Added a check for Inline 0.41 or better during "perl Makefile.PL" when
-  Mail::Folder::FastReader is selected to be installed. (Thanks to Brian L.
-  Johnson for the problem report.)
-- Modified Makefile.PL to ask whether the user wants FastReader regardless of
-  whether they specified arguments to "make Makefile.PL".
-- Modified Makefile.PL to allow the user to interactively specify the
-  installation path.
-- Fixed a typo in debugging output for emails without "Date:" headers.
-- Improved error messages.
-- Usage message now displays just the flags, --help shows a summary of their
-  meanings as well.
+New in version 4.60:
+
+- Removed -B flag and added -S flag. -B is now performed using -bS.
+- Added installation flags to suppress interactive installation. (Thanks to
+  Joey Hess for the problem report. He had to patch Makefile.PL for his Debian
+  packaging.)
+- Fixed a slow implementation of searching for signatures that would cause
+  grepmail to crawl for very large emails. Thanks to Joey Hess for discovering
+  the inefficiency.
+- Fixed a short-circuit which should have bypassed the search for signatures
+  if -B was not specified. Thanks to Joey Hess for finding the bug.
+- Implemented a new Perl parser which is 5% to 50% faster depending on how
+  I/O-bound your system is.
+- Restructured the code a bit and improved detection of invalid arguments.
 
 
 MODULE DEPENDENCIES
@@ -61,21 +53,38 @@ INSTALLATION
 => On Non-Windows systems:
 
   % perl Makefile.PL
-  [Choose whether or not to use Mail::Folder::FastReader.]
   % make
   % make test
   % make install
 
-If make test fails, please run
+By default, "perl Makefile.PL" does an interactive installation. You can avoid
+the question about installing Mail::Folder::FastReader by specifying either
+"FASTREADER=0" or "FASTREADER=1". You can avoid the question about the
+installation location by specifying either "PREFIX=/installation/path" (for
+installation into a custom location), "INSTALLDIRS=site" (for installation
+into site-specific Perl directories), or "INSTALLDIRS=perl" (for installation
+into standard Perl directories).
+
+If make test fails, please see the INSTALLATION PROBLEMS section below.
+
+=> On Windows systems:
+
+- Just copy "grepmail" to a place in your path. You may want to rename it
+  "grepmail.pl" if you've associated .pl files with perl.exe.
+
+
+INSTALLATION PROBLEMS
+
+If "make test" fails, run
 
   make testfunc
 
-and see which test(s) are failing. Please email the output of running
-the particular test with the -D flag (e.g.:
+and see which test(s) are failing. Please email, to the address below, the
+test##.stderr and test##.stdout files for the test, which are located in
+t/results. Also email the output of running the test with the -D flag. e.g.:
 
-  blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt
-
-to the address below.
+  blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt \
+    > test##.debug
 
 If you see errors about your timezone, and you are in an uncommon timezone, it
 may be the case that Date::Manip does not support your timezone yet. Try this:
@@ -84,14 +93,11 @@ may be the case that Date::Manip does not support your timezone yet. Try this:
 
 If you get an error, contact the author of Date::Manip.
 
-=> On Windows systems:
-
-- Just copy "grepmail" to a place in your path
-
 
 DOCUMENTATION
 
-"perldoc grepmail"
+Just "perldoc grepmail". After installation on Unix systems, you can also do
+"man grepmail".
 
 
 HOMEPAGE
@@ -104,8 +110,8 @@ REPORTING BUGS
 
 You can report bugs at http://sourceforge.net/bugs/?group_id=2207. If the test
 suite is failing, please attach the .stdout and .stderr files for the test
-case(s), which are located in t/results. If this is a bug not in the test suite,
-please attach the output of running grepmail with the -D switch.
+case(s), which are located in t/results. If this is a bug not in the test
+suite, please attach the output of running grepmail with the -D switch.
 
 NOTE: If you get a warning which says "Use of uninitialized value in pattern
 match (m//)", check your version of Perl (perl -v). If you're using version
