@@ -1,3 +1,12 @@
+New in version 4.48:
+- Grepmail now converts Gnus emails into mbox emails before printing them.
+  (Thanks to Johan Vromans <JVromans@squirrel.nl> for supplying a patch and
+  explaining the need for it.
+
+New in version 4.47:
+- Fixed a couple bugs in -M processing
+- -M is now 19% faster. (It's now only about 9% slower than without -M.)
+
 New in version 4.46:
 - Fixed a bug in -u message id processing. (Thanks go to an anonymous bug
   reporter on SourceForge.)

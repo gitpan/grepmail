@@ -4,29 +4,12 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.46:
-- Fixed a bug in -u message id processing. (Thanks go to an anonymous bug
-  reporter on SourceForge.)
-- Added more workarounds to prevent warnings resulting from a bug in Perl 5.6
-  (Thanks to Joey Hess <joey@kitenet.net>)
-- Added -Z flag to tell grepmail not to use Mail::Folder::FastReader even if
-  it is installed.
-- Fixed a bug introduced in version 4.44 where -m would not work unless used
-  with -n. (Thanks to Imre Simon <is@ime.usp.br> for catching this.)
-- --help anywhere on the command line now causes the help to be printed,
-  instead of only when used as the first argument.
-- Test script now exercises both the Mail::Folder::FastReader and perl mailbox
-  implementations as appropriate.
-- Restructured code to separate out Perl mailbox implementation as
-  Mail::Folder::SlowReader. (This module is embedded in the grepmail script.)
+New in version 4.48:
+- Grepmail now converts Gnus emails into mbox emails before printing them.
 
-New in version 4.45:
-- Added -n and -V to usage message.
-- Added workarounds to prevent warnings resulting from a bug in Perl 5.6
-- A blank line before the start of an email is not required now. This
-  allows broken folders created by Netscape to be read.
-
-See the file CHANGES for a complete change history and credits.
+New in version 4.47:
+- Fixed a couple bugs in -M processing
+- -M is now 19% faster. (It's now only about 9% slower than without -M.)
 
 
 MODULE DEPENDENCIES
@@ -36,7 +19,7 @@ patterns. However, if you want to search based on date, the
 Date::Parse module is required. If you want to use more complex date
 specifications, then Date::Manip should be installed as well.
 
-Starting with version 4.44, an addtional module is distributed with
+Starting with version 4.44, an additional module is distributed with
 grepmail, called Mail::Folder::FastReader. It implements the email
 reading capability in C for 10-20% faster execution, depending on your
 system. This module is compiled and installed during the installation

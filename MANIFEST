@@ -14,6 +14,7 @@ FastReader/lib/main.c                 FastReader C test program
 FastReader/t/simple.t                 FastReader Perl test program
 FastReader/t/mailarc-1.txt            FastReader input file
 t/functionality.t                     A test of the script's correctness
+t/gnus.txt                            Input file
 t/mailarc-1.txt                       Input file
 t/mailarc-2.txt                       Input file
 t/mailarc-2.txt.gz                    Input file
@@ -103,3 +104,5 @@ t/results/test41.stdout.real          Correct STDOUT output file
 t/results/test41.stderr.real          Correct STDERR output file
 t/results/test42.stdout.real          Correct STDOUT output file
 t/results/test42.stderr.real          Correct STDERR output file
+t/results/test43.stdout.real          Correct STDOUT output file
+t/results/test43.stderr.real          Correct STDERR output file
