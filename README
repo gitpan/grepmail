@@ -4,6 +4,13 @@ Grepmail searches a normal or gzip'ed mailbox for a given regular expression,
 and returns those emails that match it. Piped input is allowed, and date
 restrictions are supported.
 
+New in version 3.7:
+- Added -D for debugging output
+- Now ignores ASCII files that don't look like mailboxes
+- Uses Date::Parse instead of Date::Manip, which results in faster execution
+  time at the expense of less flexibility. (e.g. You can't do "12pm January 5
+  1997" any more)
+
 New in version 3.6:
 - No more temporary files! This addresses the security issues that a few
   people have sent me email about. The new version uses a bit more memory,
@@ -12,12 +19,7 @@ New in version 3.6:
   insights and contributions toward making this release happen, especially the
   buffering code.
 
-New in version 3.5:
-- grepmail will not try to decompress piped input that is empty.
-- Temporary files are now placed in the user's home directory to help avoid
-  privacy attacks (or in the directory specified by the TMPDIR environment
-  variable, if it exists).
-- Fixed a bug that would occasionally leave a tempfile around.
+See the file CHANGES for a complete change history.
 
 Written by David Coppit (coppit@cs.virginia.edu,
   http://www.cs.virginia.edu/~dwc3q/index.html)
