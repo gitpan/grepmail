@@ -1,3 +1,28 @@
+New in version 4.90:
+- Made Mail::Folder::SlowReader object-oriented
+- Removed FastReader from distribution. (It's no longer faster! Also, I
+  couldn't integrate it easily with the new object-oriented reader design.)
+- Fixed a bug where in some cases emails were not being converted to mbox
+  format before being printed
+- Made searches involving header-related constraints a bit faster
+- Added missing documentation for -F flag
+- Added -f flag to search based on message status. (Feature suggestion by
+  Richard D Alloway <ralloway@winbeam.com>)
+- Fixed a bug where -X and -Y flags after a pattern would not be processed
+- Added experimental caching capability, which is perhaps 5% slower the first
+  time you run grepmail on a mail folder, and 10-20% faster on subsequent
+  runs. The cache is stored in ~/.grepmail-cache. You must edit the grepmail
+  file and set $USE_CACHING to true to use this feature. (Idea and initial
+  patch by terry jones <terry@eatoni.com>)
+
+New in version 4.81:
+- Fixed incompatibilities with older (5.005_03) versions of Perl
+- Fixed test cases which fail on operating systems (shells?) which emit
+  "Broken Pipe" to standard output. I'd rather break the pipe than have
+  grepmail gobble megabytes of data when it can't handle it.
+- Added --version flag (patch by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>)
+- Added documentation for -V flag.
+
 New in version 4.80:
 - Added prototype -E flag to support complex searches. (Thanks to Nelson Minar
   <nelson@monkey.org> for the original suggestion in Sep 2000, And terry jones

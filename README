@@ -2,32 +2,42 @@ grepmail - search mailboxes for a particular email
 
 Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
-allowed, and date and size restrictions are supported.
+allowed, and date and size restrictions are supported, as are searches using
+logical operators.
 
-New in version 4.80:
-- Added prototype -E flag to support complex searches. (Thanks to Nelson Minar
-  for the original suggestion in Sep 2000, And terry jones for seconding the
-  idea.)
-- Added -F flag to force processing of files which grepmail determines are not
-  mailboxes. (feature suggested by terry jones)
-- Documentation updated to reflect that -B no longer exists. (By terry jones)
-- The test to determine if a file is a mailbox was improved to adhere better
-  to RFC 822, while still providing some flexibility. (Initial suggestion and
+New in version 4.90:
+- Made Mail::Folder::SlowReader object-oriented
+- Removed FastReader from distribution. (It's no longer faster! Also, I
+  couldn't integrate it easily with the new object-oriented reader design.)
+- Fixed a bug where in some cases emails were not being converted to mbox
+  format before being printed
+- Made searches involving header-related constraints a bit faster
+- Added missing documentation for -F flag
+- Added -f flag to search based on message status. (Feature suggestion by
+  Richard D Alloway)
+- Fixed a bug where -X and -Y flags after a pattern would not be processed
+- Added experimental caching capability, which is perhaps 5% slower the first
+  time you run grepmail on a mail folder, and 10-20% faster on subsequent
+  runs. The cache is stored in ~/.grepmail-cache. You must edit the grepmail
+  file and set $USE_CACHING to true to use this feature. (Idea and initial
   patch by terry jones)
-- Improved date extraction to also look at the 'From ' line when both the
-  Received and Date headers fail. (patch by terry jones)
-- Fixed a long-standing bug in which filenames of compressed mailboxes which
-  contained special shell characters would cause problems. (Thanks to Jost
-  Krieger for giving me the kick in the pants to finally fix this.)
-- Fixed a long-standing bug in which grepmail would incorrectly report the
-  filename of compressed mailboxes in error messages. (Thanks to Jost Krieger
-  for giving me the kick in the pants to finally fix this.)
 
-As with last release, this release benefits greatly from the feedback and
-insight of Terry Jones. His desire for complex pattern matches, along with
-Nelson Minar's original request, is the reason for the new -E flag. This flag
-allows you to perform complex searches involving logical operators. For
-example,
+
+SOME NOTES
+
+Caching:
+
+Caching appears to be working, but is currently disabled by default because
+the speedup is only 10-20%, and because it requires a file to be created in
+the user's directory. I'm hoping that the caching infrastructure can lead to
+further improvements. For example, we should cache the boundaries of
+attachments for the -M flag. Also, the current self-rolled implementation may
+be better served using Cache::FileCache instead.
+
+Complex queries:
+
+The -E flag allows you to perform complex searches involving logical
+operators. For example,
 
   $email_header =~ /^From: .*\@coppit.org/ && $email =~ /grepmail/i
 
@@ -52,6 +62,8 @@ following:
   to an individual pattern match to make it case-insensitive. Should there be
   a standard way of dealing with such "global" pattern matching options on an
   individual pattern match basis? 
+
+Message IDs:
 
 NOTE: For emails without message ids, grepmail will use Digest::MD5 to
 compute a hash based on the email header. If you don't have

@@ -2,7 +2,7 @@
 
 # grepmail
 
-$VERSION = '4.80';
+$VERSION = '4.90';
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
@@ -24,77 +24,9 @@ $VERSION = '4.80';
 # This code is distributed under the GNU General Public License (GPL). See
 # http://www.opensource.org/gpl-license.html and http://www.opensource.org/.
 
-# Notes:
-# It turns out that -h, -b, -d, -s and -v have some nasty feature interaction.
-# Here's a table of how matching should occur for each combination of flags:
-#
-# % B, H, S, D,!V
-#   Match if body, header, size, and date match
-# %!B, H, S, D,!V
-#   Match if header, size, and date match -- don't care about body
-# % B,!H, S, D,!V
-#   Match if body, size, and date match -- don't care about header
-# % B, H,!S, D,!V
-#   Match if body, header, and date match -- don't care about size
-# % B, H, S,!D,!V
-#   Match if body, header, and size match -- don't care about date
-# %!B,!H, S, D,!V
-#   Match if size and date and (body or header) matches
-#*%!B, H,!S, D,!V
-#   Match if header and date matches -- don't care about body or size
-# %!B, H, S,!D,!V
-#   Match if header and size matches -- don't care about body or date
-# % B,!H,!S, D,!V
-#   Match if body and date matches -- don't care about header or size
-# % B,!H, S,!D,!V
-#   Match if body and size matches -- don't care about header or date
-# % B, H,!S,!D,!V
-#   Match if body and header matches -- don't care about size or date
-#*%!B,!H,!S, D,!V
-#   Match if date and (body or header) matches -- don't care about size
-# %!B,!H, S,!D,!V
-#   Match if size and (body or header) matches -- don't care about date
-#*%!B, H,!S,!D,!V
-#   Match if header matches -- don't care about body, size, or date
-#   B,!H,!S,!D,!V
-#   Match if body matches -- don't care about header, size, or date
-#*  B, H, S, D, V
-#   Match if body, header, size, or date doesn't match
-#* !B, H, S, D, V
-#   Match if header, size, or date doesn't match -- don't care about body
-#*  B,!H, S, D, V
-#   Match if body, size, or date doesn't match -- don't care about header
-#*  B, H,!S, D, V
-#   Match if body, header, or date doesn't match -- don't care about size
-#*  B, H, S,!D, V
-#   Match if body, header, or size doesn't match -- don't care about date
-#* !B,!H, S, D, V
-#   Match if size or date doesn't match -- don't care about body or header
-#*%!B, H,!S, D, V
-#   Match if header or date doesn't match -- don't care about body or size
-#* !B, H, S,!D, V
-#   Match if header or size doesn't match -- don't care about body or date
-#*  B,!H,!S, D, V
-#   Match if body or date doesn't match -- don't care about header or size
-#*  B,!H, S,!D, V
-#   Match if body or size doesn't match -- don't care about header or date
-#*  B, H,!S,!D, V
-#   Match if body or header doesn't match -- don't care about size or date
-#*%!B,!H,!S, D, V
-#   Match if date or (body and header) don't match -- don't care about size
-#* !B,!H, S,!D, V
-#   Match if size or (body and header) don't match -- don't care about date
-#*%!B, H,!S,!D, V
-#   Match if header doesn't match -- don't care about body, size, or date
-#   B,!H,!S,!D, V
-#   Match if body doesn't match -- don't care about header, size, or date
-#
-#* Indicates early match candidate based on the header only
-#% Indicates early nonmatch candidate based on the header only
-
 require 5.00396;
 
-use vars qw( %opts $pattern $commandLine $VERSION %message_ids_seen );
+use vars qw( %opts $pattern $commandLine $VERSION %message_ids_seen $USE_CACHING );
 
 use Getopt::Std;
 
@@ -102,7 +34,10 @@ use strict;
 use FileHandle;
 use Carp;
 
-#-------------------------------------------------------------------------------
+# Set to 1 to enable experimental caching capability
+$USE_CACHING = 0;
+
+################################################################################
 
 package Mail::Folder::SlowReader;
 
@@ -112,15 +47,12 @@ no strict;
 
 @ISA = qw(Exporter DynaLoader);
 @EXPORT = qw();
-@EXPORT_OK = qw( reset_file read_email );
+@EXPORT_OK = qw( $DEBUG SETUP_CACHE );
 
 use strict;
+use vars qw( $VERSION $DEBUG );
 
-my $LINE = 0;
-my $FILE_HANDLE = undef;
-my $START = 0;
-my $END = 0;
-my $READ_BUFFER = '';
+$VERSION = '1.00';
 
 my %HEADER_PATTERNS = (
 '^TO:' =>
@@ -131,34 +63,316 @@ my %HEADER_PATTERNS = (
   '(^(((Resent-)?(From|Sender)|X-Envelope-From):|>?From)([^>]*[^(.%@a-z0-9])?(Post(ma(st(er)?|n)|office)|(send)?Mail(er)?|daemon|mmdf|n?uucp|ops|r(esponse|oot)|(bbs\.)?smtp(error)?|s(erv(ices?|er)|ystem)|A(dmin(istrator)?|MMGR))(([^).!:a-z0-9][-_a-z0-9]*)?[%@>\t][^<)]*(\(.*\).*)?)?$([^>]|$))',
 );
 
-sub reset_file
-{
-  my $file_handle = shift;
+# Need this for a lookahead.
+my $READ_CHUNK_SIZE = 20000;
 
-  $FILE_HANDLE = $file_handle;
-  $LINE = 1;
-  $START = 0;
-  $END = 0;
-  $READ_BUFFER = '';
+$DEBUG = 0;
+
+# The class-wide cache, which will be read and written when necessary. i.e.
+# read when an folder reader object is created which uses caching, and
+# written when a different cache is specified, or when the program exits, 
+my $CACHE = undef;
+
+my %DEFAULT_CACHE_OPTIONS = (
+  'file_name' => "$ENV{'HOME'}/.grepmail-cache",
+);
+
+my %CACHE_OPTIONS;
+
+my $USING_CACHE = 0;
+
+my $UPDATING_CACHE = 0;
+
+my $CACHE_MODIFIED = 0;
+
+#-------------------------------------------------------------------------------
+
+# Outputs debug messages if $DEBUG is true. Be sure to return 1 so code like
+# 'dprint "blah\n" and exit' works.
+
+sub dprint
+{
+  return 1 unless $DEBUG;
+
+  my $message = join '',@_;
+
+  foreach my $line (split /\n/, $message)
+  {
+    warn "DEBUG (" . __PACKAGE__ . "): $line\n";
+  }
+
+  return 1;
 }
 
 #-------------------------------------------------------------------------------
 
-# Need this for a lookahead.
-my $READ_CHUNK_SIZE = 20000;
-
-sub read_email
+sub SETUP_CACHE
 {
-  # Undefined read buffer means we hit eof on the last read.
-  return 0 unless defined $READ_BUFFER;
+  my $options = shift;
 
-  my $line = $LINE;
+  # Load Storable if we need to
+  unless (defined $Storable::VERSION)
+  {
+    if (eval 'require Storable;')
+    {
+      import Storable;
+    }
+    else
+    {
+      warn __PACKAGE__ . ": caching is enabled, " .
+        "but you do not have Storable. " .
+        "Get it from CPAN.\n";
+      exit 1;
+    }
+  }
 
-  $START = $END;
+  # See if the client is setting up a different cache
+  if (defined $options && exists $options->{file_name} &&
+    $options->{file_name} ne $CACHE_OPTIONS{file_name})
+  {
+    dprint "New cache file specified--writing old cache if necessary.";
+    _WRITE_CACHE() if $USING_CACHE && $CACHE_MODIFIED;
+    undef $CACHE;
+  }
+
+  # Override the default settings with the user-specified ones
+  %CACHE_OPTIONS = %DEFAULT_CACHE_OPTIONS;
+  map { $CACHE_OPTIONS{$_} = $options->{$_} } keys %$options;
+
+  _READ_CACHE();
+
+  $USING_CACHE = 1;
+  $CACHE_MODIFIED = 0;
+}
+
+#-------------------------------------------------------------------------------
+
+sub _READ_CACHE
+{
+  my $self = shift;
+
+  dprint "Reading cache";
+
+  unless (-e $CACHE_OPTIONS{file_name})
+  {
+    dprint "Can't find cache file \"$CACHE_OPTIONS{file_name}\" to read";
+    return;
+  }
+
+  # Unserialize using Storable
+  $CACHE = retrieve($CACHE_OPTIONS{file_name});
+}
+
+#-------------------------------------------------------------------------------
+
+sub _WRITE_CACHE
+{
+  # In case this is called during cleanup following an error loading
+  # Storable
+  return unless defined $Storable::VERSION;
+
+  dprint "Writing cache";
+
+  # Serialize using Storable
+  store($CACHE, $CACHE_OPTIONS{file_name});
+}
+
+#-------------------------------------------------------------------------------
+
+# Write the cache when the program exits
+sub END
+{
+  dprint "Program is exiting. Writing cache.";
+
+  _WRITE_CACHE() if $USING_CACHE && $CACHE_MODIFIED;
+}
+
+#-------------------------------------------------------------------------------
+
+# Options: 
+# - file_name: the name of the file. This must be set for caching to occur.
+# - file_handle: the file handle to read from
+# - use_cache: set to true if you want to use the cache
+# - cache_options: a reference to a hash containing cache options
+sub new
+{
+  my ($proto, $options) = @_;
+
+  my $class = ref($proto) || $proto;
+  my $self  = {};
+  bless ($self, $class);
+
+  $self->{line_number} = 1;
+
+  $self->{file_handle} = undef;
+  $self->{file_handle} = $options->{file_handle}
+    if exists $options->{file_handle};
+
+  # The buffer information. (Used when caching is not enabled)
+  $self->{read_buffer} = '';
+  $self->{start} = 0;
+  $self->{end} = 0;
+
+  $self->{end_of_file} = 0;
+
+  # The line number of the last read email.
+  $self->{email_line_number} = 0;
+
+
+  # This is the 0-based number of the email. We'll use it as an index into the
+  # cache, if the cache is being used.
+  $self->{email_number} = 0;
+
+  # We need the file name as a key to the cache
+  $self->{file_name} = $options->{file_name};
+
+  $self->_print_debug_information();
+
+  $self->_validate_and_initialize_cache_entry() if $USING_CACHE;
+
+  return $self;
+}
+
+#-------------------------------------------------------------------------------
+
+sub _print_debug_information
+{
+  my $self = shift;
+
+  return unless $DEBUG;
+
+  dprint "Version: $VERSION";
+
+  dprint "Email file: $self->{file_name}";
+  dprint "Valid cache entry exists: " .
+    ($#{ $CACHE->{$self->{file_name}}{lengths} } != -1 ? "Yes" : "No");
+}
+
+#-------------------------------------------------------------------------------
+
+sub _validate_and_initialize_cache_entry
+{
+  my $self = shift;
+
+  if (!defined $self->{file_name})
+  {
+    warn __PACKAGE__ . ": no file name, so caching is disabled.\n";
+
+    $USING_CACHE = 0;
+  }
+  else
+  {
+    my @stat = stat $self->{file_name};
+
+    # The file should always exist at this point
+    die "The file $self->{file_name} does not exist!"
+      unless scalar(@stat);
+
+    my $size = $stat[7];
+    my $time_stamp = $stat[9];
+
+    if (exists $CACHE->{$self->{file_name}})
+    {
+      if ($CACHE->{$self->{file_name}}{size} != $size ||
+        $CACHE->{$self->{file_name}}{time_stamp} != $time_stamp)
+      {
+        dprint "Size or time stamp has changed for file " .
+          $self->{file_name} . ". Invalidating cache entry";
+
+        delete $CACHE->{$self->{file_name}};
+      }
+    }
+
+    if (exists $CACHE->{$self->{file_name}})
+    {
+      $UPDATING_CACHE = 0;
+    }
+    else
+    {
+      $CACHE->{$self->{file_name}}{size} = $size;
+      $CACHE->{$self->{file_name}}{time_stamp} = $time_stamp;
+      $CACHE->{$self->{file_name}}{lengths} = [];
+      $UPDATING_CACHE = 1;
+    }
+  }
+}
+
+#-------------------------------------------------------------------------------
+
+# Returns true if the file handle has been fully read
+sub end_of_file
+{
+  my $self = shift;
+
+  return $self->{end_of_file};
+}
+
+#-------------------------------------------------------------------------------
+
+# The line number of the last email read
+sub line_number
+{
+  my $self = shift;
+
+  return $self->{email_line_number};
+}
+
+#-------------------------------------------------------------------------------
+
+# Reads an email from the file and returns it.
+# Preconditions:
+# - file handle is set and open
+# - not end of file
+sub _cache_read_next_email
+{
+  my $self = shift;
+
+  dprint "Using cache" if $DEBUG;
+
+  $self->{email_line_number} = $self->{line_number};
+  my $email_length = 
+    $CACHE->{$self->{file_name}}{lengths}[$self->{email_number}];
+
+  while (read($self->{file_handle}, $self->{read_buffer}, $email_length))
+  {
+    last if $email_length <= length($self->{read_buffer});
+  }
+
+  $self->{start} = 0;
+  $self->{end} = $email_length;
+
+  if (eof $self->{file_handle} &&
+    $self->{end} == length($self->{read_buffer}))
+  {
+    $self->{end_of_file} = 1;
+  }
+
+  $self->{line_number} += ($self->{read_buffer} =~ tr/\n//);
+#  $self->{line_number} +=
+#    $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}];
+
+  $self->{email_number}++;
+}
+
+#-------------------------------------------------------------------------------
+
+# Reads an email from the file and returns it.
+# Preconditions:
+# - file handle is set and open
+# - not end of file
+sub _noncache_read_next_email
+{
+  my $self = shift;
+
+  dprint "Using cache" if $DEBUG;
+
+  $self->{email_line_number} = $self->{line_number};
+
+  $self->{start} = $self->{end};
 
   # Look for the start of the next email
   LOOK_FOR_NEXT_HEADER:
-  while ($READ_BUFFER =~ m/^From\s
+  while ($self->{read_buffer} =~ m/^From\s
     (
       # Skip names, months, days
       (?> [^:]+ ) 
@@ -168,34 +382,50 @@ sub read_email
       (?: \s+ (?: [A-Z]{2,3} | [+-]?\d{4} ) ){1,3}
     )$/xmg)
   {
-    $END = pos($READ_BUFFER) - length($1) - 5;
+    $self->{end} = pos($self->{read_buffer}) - length($1) - 5;
 
     # Don't stop on email header for the first email in the buffer
-    next unless $END;
+    next unless $self->{end};
 
     # Keep looking if the header we found is part of a "Begin Included
     # Message".
-    my $end_of_string = substr($READ_BUFFER, $END-200, 200);
+    my $end_of_string = substr($self->{read_buffer}, $self->{end}-200, 200);
     next if $end_of_string =~
         /\n-----(?: Begin Included Message |Original Message)-----\n[^\n]*\n*$/i;
 
     # Found the next email!
-    my $email = substr($READ_BUFFER, $START, $END-$START);
-    $LINE += ($email =~ tr/\n//);
-    
-    return (1, $email, $line);
+    my $email = substr($self->{read_buffer}, $self->{start}, $self->{end}-$self->{start});
+    $self->{line_number} += ($email =~ tr/\n//);
+
+    if ($UPDATING_CACHE)
+    {
+      dprint("Storing data into cache, length " . length($email)) if $DEBUG;
+
+      $CACHE->{$self->{file_name}}{lengths}[$self->{email_number}] =
+        length($email);
+
+      $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}] =
+        $self->{email_line_number};
+
+      $CACHE_MODIFIED = 1;
+
+      $self->{email_number}++;
+    }
+
+    return $email;
   }
 
   # Didn't find next email in current buffer. Most likely we need to read some
   # more of the mailbox. Shift the current email to the front of the buffer
   # unless we've already done so.
-  $READ_BUFFER = substr($READ_BUFFER,$START) unless $START == 0;
-  $START = 0;
+  $self->{read_buffer} = substr($self->{read_buffer},$self->{start})
+    unless $self->{start} == 0;
+  $self->{start} = 0;
 
   # Start looking at the end of the buffer, but back up some in case the edge
   # of the newly read buffer contains the start of a new header. I believe the
   # RFC says header lines can be at most 90 characters long.
-  my $search_position = length($READ_BUFFER) - 90;
+  my $search_position = length($self->{read_buffer}) - 90;
   $search_position = 0 if $search_position < 0;
 
   # Can't use sysread because it doesn't work with ungetc
@@ -203,48 +433,91 @@ sub read_email
   {
     local $/ = undef;
 
-    if (eof $FILE_HANDLE)
+    if (eof $self->{file_handle})
     {
-      my $email = $READ_BUFFER;
-      undef $READ_BUFFER;
-      return (1, $email, $line);
+      $self->{end_of_file} = 1;
+
+      if ($UPDATING_CACHE)
+      {
+        dprint("Storing data into cache, length " .
+          length($self->{read_buffer})) if $DEBUG;
+
+        $CACHE->{$self->{file_name}}{lengths}[$self->{email_number}] =
+          length($self->{read_buffer});
+
+        $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}] =
+          $self->{email_line_number};
+
+        $CACHE_MODIFIED = 1;
+
+        $self->{email_number}++;
+      }
+
+      return $self->{read_buffer};
     }
     else
     {
-      $READ_BUFFER = <$FILE_HANDLE>;
-      pos($READ_BUFFER) = $search_position;
+      # < $self->{file_handle} > doesn't work, so we use readline
+      $self->{read_buffer} = readline($self->{file_handle});
+      pos($self->{read_buffer}) = $search_position;
       goto LOOK_FOR_NEXT_HEADER;
     }
   }
   else
   {
-    if (read($FILE_HANDLE, $READ_BUFFER, $READ_CHUNK_SIZE, length($READ_BUFFER)))
+    if (read($self->{file_handle}, $self->{read_buffer}, $READ_CHUNK_SIZE,
+      length($self->{read_buffer})))
     {
-      pos($READ_BUFFER) = $search_position;
+      pos($self->{read_buffer}) = $search_position;
       goto LOOK_FOR_NEXT_HEADER;
     }
     else
     {
-      my $email = $READ_BUFFER;
-      undef $READ_BUFFER;
-      return (1, $email, $line);
+      $self->{end_of_file} = 1;
+
+      if ($UPDATING_CACHE)
+      {
+        dprint("Storing data into cache, length " .
+          length($self->{read_buffer})) if $DEBUG;
+
+        $CACHE->{$self->{file_name}}{lengths}[$self->{email_number}] =
+          length($self->{read_buffer});
+
+        $CACHE->{$self->{file_name}}{line_numbers}[$self->{email_number}] =
+          $self->{email_line_number};
+
+        $CACHE_MODIFIED = 1;
+
+        $self->{email_number}++;
+      }
+
+      return $self->{read_buffer};
     }
   }
 }
 
-sub Read_Chunk_Of_Body
+#-------------------------------------------------------------------------------
+
+# Reads an email from the file and returns it.
+# Preconditions:
+# - file handle is set and open
+# - not end of file
+sub read_next_email
 {
-  my $email = shift;
+  my $self = shift;
 
-  local $/ = "\nFrom ";
-  my $chunk = <$FILE_HANDLE>;
-  local $/ = 'From ';
-  chomp $chunk;
-
-  $LINE += ($chunk =~ tr/\n//);
-
-  $$email .= $chunk;
+  if ($USING_CACHE && !$UPDATING_CACHE)
+  {
+    $self->_cache_read_next_email();
+    return $self->{read_buffer};
+  }
+  else
+  {
+    return $self->_noncache_read_next_email();
+  }
 }
+
+################################################################################
 
 package main;
 
@@ -273,7 +546,7 @@ sub dprint
 
   foreach my $line (split /\n/, $message)
   {
-    print STDERR "DEBUG: $line\n";
+    warn "DEBUG: $line\n";
   }
 
   return 1;
@@ -287,7 +560,7 @@ sub reportAndExit
 {
   my $message = shift;
 
-  print STDERR "grepmail: $message.\n";
+  warn "grepmail: $message.\n";
   exit 1;
 }
 
@@ -347,18 +620,6 @@ my ($opts_ref,@remaining_arguments) = Get_Options(@ARGV);
 
 Print_Debug_Information($commandLine);
 
-# LOAD THE MAIL::FOLDER::FASTREADER IF IT'S INSTALLED
-if (!$opts{'Z'} && eval "require Mail::Folder::FastReader;")
-{
-  import Mail::Folder::FastReader 'reset_file', 'read_email';
-  dprint "Using Mail::Folder::FastReader";
-}
-else
-{
-  import Mail::Folder::SlowReader 'reset_file', 'read_email';
-  dprint "Not using Mail::Folder::FastReader";
-}
-
 sub ProcessDate($);
 sub GetFiles(@);
 
@@ -366,7 +627,8 @@ sub GetFiles(@);
 if ($opts{'E'})
 {
   # Have to do -Y before -h because the former implies the latter
-  for my $option qw(e M S Y)
+  my @options = qw(e M S Y);
+  for my $option (@options)
   {
     if ($opts{$option})
     {
@@ -435,13 +697,14 @@ sub Get_Options
   local @ARGV = @_;
 
   # Print usage error if no arguments given
-  print "No arguments given.\n\n" . usage() and exit(1) unless @ARGV;
+  warn "No arguments given.\n\n" . usage() and exit(1) unless @ARGV;
 
-  # Check for --help, the standard usage command
+  # Check for --help, the standard usage command, or --version.
   print help() and exit(0) if grep { /^--help$/ } @ARGV;
+  print "$VERSION\n" and exit(0) if grep { /^--version$/ } @ARGV;
 
   my @valid_options =
-    qw( D e E F i q h b v l r R a M m s u n Z H S d V X Y );
+    qw( D e E f F i q h b v l r R a M m s u n Z H S d V X Y );
 
   my %opts;
 
@@ -452,8 +715,8 @@ sub Get_Options
   $opts{'d'} = $opts{'V'} = undef;
   $opts{'X'} = '^-- $';
 
-  # Ensure valid options
-  getopt("eEdsXY",\%opts);
+  # Ensure valid options. ALSO UPDATE 2ND GETOPT CALL BELOW
+  getopt("efEdsXY",\%opts);
 
   # Here we have to deal with the possibility that the user specified the
   # search pattern without the -e flag.
@@ -476,11 +739,11 @@ sub Get_Options
     if ( $#ARGV > 0 && $ARGV[1] =~ /^-$missing_flags$/ )
     {
       $pattern = shift @ARGV;
-      getopt("ds",\%opts);
+      getopt("fdsXY",\%opts);
     }
-    # If we've seen a -d, -s, or -u flag, and it doesn't look like there are
+    # If we've seen a -d, -f, -s, or -u flag, and it doesn't look like there are
     # flags following $ARGV[0], then look at the value in $ARGV[0]
-    elsif ( ( defined $opts{'d'} || $opts{'s'} || $opts{'u'} ) &&
+    elsif ( ( defined $opts{'d'} || $opts{'f'} || $opts{'s'} || $opts{'u'} ) &&
          ( $#ARGV <= 0 ||
            ( $#ARGV > 0 && $ARGV[1] !~ /^-$missing_flags$/ )
          )
@@ -498,9 +761,9 @@ sub Get_Options
         $pattern = shift @ARGV;
       }
     }
-    # If we still don't have a pattern or any -d, -s, or -u flag, we assume
+    # If we still don't have a pattern or any -d, -f, -s, or -u flag, we assume
     # that $ARGV[0] is the pattern
-    elsif (!defined $opts{'d'} && !$opts{'s'} && !$opts{'u'})
+    elsif (!defined $opts{'d'} && !$opts{'f'} && !$opts{'s'} && !$opts{'u'})
     {
       $pattern = shift @ARGV;
     }
@@ -508,7 +771,7 @@ sub Get_Options
 
   if ($opts{'e'} || $opts{'E'})
   {
-    print "You specified two search patterns.\n" and exit (1)
+    warn "You specified two search patterns.\n" and exit (1)
       if defined $pattern;
 
     if ($opts{'e'})
@@ -518,10 +781,6 @@ sub Get_Options
     else
     {
       $pattern = $opts{'E'};
-#
-#      if ($pattern !~ /=~/)
-#      {
-#      }
     }
   }
   elsif (defined $opts{'V'})
@@ -532,11 +791,11 @@ sub Get_Options
   }
   elsif (!defined $pattern)
   {
-    # The only times you don't have to specify the pattern is when -d, -s, or -u
+    # The only times you don't have to specify the pattern is when -d, -f, -s, or -u
     # is being used. This should catch people who do "grepmail -h" thinking
     # it's help.
-    print "Invalid arguments.\n\n" . usage() and exit (1)
-      unless defined $opts{'d'} || $opts{'s'} || $opts{'u'};
+    warn "Invalid arguments.\n\n" . usage() and exit (1)
+      unless defined $opts{'d'} || $opts{'f'} || $opts{'s'} || $opts{'u'};
 
     $pattern = '.';
   }
@@ -549,7 +808,7 @@ sub Get_Options
     }
     else
     {
-      print 'You specified -d, but do not have Date::Parse. ' .
+      warn 'You specified -d, but do not have Date::Parse. ' .
             "Get it from CPAN.\n";
       exit (1);
     }
@@ -562,7 +821,7 @@ sub Get_Options
   {
     unless (grep {/^$option$/} @valid_options)
     {
-      print "Invalid argument: \"$option\".\n\n" . usage() and exit (1)
+      warn "Invalid argument: \"$option\".\n\n" . usage() and exit (1)
     }
   }
 
@@ -653,7 +912,7 @@ sub GetFiles(@)
 
       unless (eval "require File::Find;")
       {
-        print "You specified -R, but do not have File::Find. ".
+        warn "You specified -R, but do not have File::Find. ".
               "Get it from CPAN.\n";
         exit (1);
       }
@@ -1032,20 +1291,21 @@ sub Do_Simple_Pattern_Matching
   my $numberOfMatches = shift;
   my $line = shift;
 
-  dprint "Checking for early match or abort based on header information.";
+  dprint "Checking for early match or abort based on header information."
+    if $opts{'D'};
 
   my ($result,$matchesHeader) =
-    AnalyzeHeader($$email_header,$fileHandle,$pattern);
+    AnalyzeHeader($email_header,$email,$fileHandle,$pattern,1);
 
   if ($result == $SKIP)
   {
-    dprint "Doing an early abort based on header.";
+    dprint "Doing an early abort based on header." if $opts{'D'};
     return ($CONTINUE,$numberOfMatches);
   }
 
   if ($result == $PRINT)
   {
-    dprint "Doing an early printout based on header.";
+    dprint "Doing an early printout based on header." if $opts{'D'};
     if ($opts{'l'})
     {
       print "$fileName\n";
@@ -1060,7 +1320,7 @@ sub Do_Simple_Pattern_Matching
     }
     else
     {
-      PrintEmail($fileName,$$email_header,$$email_body,$number_files,$line)
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,$$email_body,$number_files,$line)
         if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
 
       return ($CONTINUE,$numberOfMatches);
@@ -1087,7 +1347,7 @@ sub Do_Simple_Pattern_Matching
     $boundary = $1 if defined $1;
     $boundary = $2 if defined $2;
 
-    dprint "Found attachments with boundary:\n  $boundary";
+    dprint "Found attachments with boundary:\n  $boundary" if $opts{'D'};
 
     my @attachment_positions;
 
@@ -1156,7 +1416,7 @@ sub Do_Simple_Pattern_Matching
   #----------------------------------------------------------------
 
   dprint "Checking for early match or abort based on header, body, " .
-    "and size information.";
+    "and size information." if $opts{'D'};
 
   my $isMatch = 1;
   
@@ -1167,12 +1427,14 @@ sub Do_Simple_Pattern_Matching
 
   if (!$isMatch && !$opts{'v'})
   {
-    dprint "Doing an early abort based on header, body, and size.";
+    dprint "Doing an early abort based on header, body, and size."
+      if $opts{'D'};
     return ($CONTINUE,$numberOfMatches);
   }
   elsif (!$isMatch && $opts{'v'})
   {
-    dprint "Doing an early printout based on header, body, and size.";
+    dprint "Doing an early printout based on header, body, and size."
+      if $opts{'D'};
   
     if ($opts{'l'})
     {
@@ -1198,18 +1460,18 @@ sub Do_Simple_Pattern_Matching
 
   #----------------------------------------------------------------
 
-  dprint "Checking date constraint.";
+  dprint "Checking date constraint." if $opts{'D'};
 
   $isMatch = 1;
 
   {
-    my $matchesDate = CheckDate($email_header);
+    my $matchesDate = Email_Matches_Date($email_header);
     $isMatch = 0 if defined $opts{'d'} && !$matchesDate;
 
     dprint "Email matches date constraint\n"
-      if defined $opts{'d'} && $matchesDate;
+      if $opts{'D'} && defined $opts{'d'} && $matchesDate;
     dprint "Email doesn't match date constraint\n"
-      if defined $opts{'d'} && !$matchesDate;
+      if $opts{'D'} && defined $opts{'d'} && !$matchesDate;
   }
 
   $isMatch = !$isMatch if $opts{'v'};
@@ -1217,7 +1479,7 @@ sub Do_Simple_Pattern_Matching
   # If the match occurred in the right place...
   if ($isMatch)
   {
-    dprint "Email matches all patterns and constraints.";
+    dprint "Email matches all patterns and constraints." if $opts{'D'};
 
     if ($opts{'l'})
     {
@@ -1239,7 +1501,7 @@ sub Do_Simple_Pattern_Matching
   }
   else
   {
-    dprint "Email did not match all patterns and constraints.";
+    dprint "Email did not match all patterns and constraints." if $opts{'D'};
   }
 
   return ($CONTINUE,$numberOfMatches);
@@ -1258,6 +1520,44 @@ sub Do_Complex_Pattern_Matching
   my $numberOfMatches = shift;
   my $line = shift;
 
+  dprint "Checking for early match or abort based on header information."
+    if $opts{'D'};
+
+  my ($result,$matchesHeader) =
+    AnalyzeHeader($email_header,$email,$fileHandle,$pattern,0);
+
+  if ($result == $SKIP)
+  {
+    dprint "Doing an early abort based on header." if $opts{'D'};
+    return ($CONTINUE,$numberOfMatches);
+  }
+
+  if ($result == $PRINT)
+  {
+    dprint "Doing an early printout based on header." if $opts{'D'};
+    if ($opts{'l'})
+    {
+      print "$fileName\n";
+  
+      # We can return since we found at least one email that matches.
+      return ($DONE,$numberOfMatches);
+    }
+    elsif ($opts{'r'})
+    {
+      $numberOfMatches++;
+      return ($CONTINUE,$numberOfMatches);
+    }
+    else
+    {
+      ConvertEmailToMboxAndPrintIt($fileName,$$email_header,$$email_body,$number_files,$line)
+        if $opts{'u'} && NotADuplicate($$email_header) || !$opts{'u'};
+
+      return ($CONTINUE,$numberOfMatches);
+    }
+  }
+
+  #----------------------------------------------------------------
+
   my $modified_pattern = $pattern;
 
   $modified_pattern =~ s/\$email_header\b/\$\$email_header/g;
@@ -1270,21 +1570,13 @@ sub Do_Complex_Pattern_Matching
 
   #----------------------------------------------------------------
 
-  my $matchesSize = length $$email < $opts{'s'};
-
-  #----------------------------------------------------------------
-
-  dprint "Checking for early match or abort based on header, body, " .
-    "and size information.";
-
   my $isMatch = 1;
-  
-  $isMatch = 0 if  $opts{'s'} && !$matchesSize ||
-    !$matchesEmail;
+  $isMatch = 0 unless $matchesEmail;
 
   if (!$isMatch && !$opts{'v'})
   {
-    dprint "Doing an early abort based on header, body, and size.";
+    dprint "Doing an early abort based on header, body, and size."
+      if $opts{'D'};
     return ($CONTINUE,$numberOfMatches);
   }
   elsif (!$isMatch && $opts{'v'})
@@ -1315,18 +1607,18 @@ sub Do_Complex_Pattern_Matching
 
   #----------------------------------------------------------------
 
-  dprint "Checking date constraint.";
+  dprint "Checking date constraint." if $opts{'D'};
 
   $isMatch = 1;
 
   {
-    my $matchesDate = CheckDate($email_header);
+    my $matchesDate = Email_Matches_Date($email_header);
     $isMatch = 0 if defined $opts{'d'} && !$matchesDate;
 
     dprint "Email matches date constraint\n"
-      if defined $opts{'d'} && $matchesDate;
+      if $opts{'D'} && defined $opts{'d'} && $matchesDate;
     dprint "Email doesn't match date constraint\n"
-      if defined $opts{'d'} && !$matchesDate;
+      if $opts{'D'} && defined $opts{'d'} && !$matchesDate;
   }
 
   $isMatch = !$isMatch if $opts{'v'};
@@ -1334,7 +1626,7 @@ sub Do_Complex_Pattern_Matching
   # If the match occurred in the right place...
   if ($isMatch)
   {
-    dprint "Email matches all patterns and constraints.";
+    dprint "Email matches all patterns and constraints." if $opts{'D'};
 
     if ($opts{'l'})
     {
@@ -1356,7 +1648,7 @@ sub Do_Complex_Pattern_Matching
   }
   else
   {
-    dprint "Email did not match all patterns and constraints.";
+    dprint "Email did not match all patterns and constraints." if $opts{'D'};
   }
 
   return ($CONTINUE,$numberOfMatches);
@@ -1377,15 +1669,43 @@ sub ProcessMailFile
 
   my $numberOfMatches = 0;
 
-  reset_file($fileHandle);
+  my $folder_reader;
+
+  $Mail::Folder::SlowReader::DEBUG = $opts{'D'};
+
+  if ($fileName eq 'Standard input')
+  {
+    $folder_reader =
+      new Mail::Folder::SlowReader( {
+        'file_handle' => $fileHandle,
+        'use_cache' => 0,
+      } );
+  }
+  else
+  {
+    Mail::Folder::SlowReader::SETUP_CACHE();
+    $folder_reader =
+      new Mail::Folder::SlowReader( {
+        'file_name' => $fileName,
+        'file_handle' => $fileHandle,
+        'use_cache' => $USE_CACHING,
+      } );
+  }
 
   # This is the main loop. It's executed once for each email
   while(1)
   {
-    dprint "Reading email";
+    dprint "Reading email" if $opts{'D'};
 
-    my ($status,$email,$line) = read_email();
-    last unless $status == 1;
+    # Direct access for performance reasons
+    #last if $folder_reader->end_of_file();
+    last if $folder_reader->{end_of_file};
+
+    my $email = $folder_reader->read_next_email();
+
+    # Direct access for performance reasons
+    #my $line = $folder_reader->line_number();
+    my $line = $folder_reader->{email_line_number};
 
     my ($email_header,$email_body) = split /\n\n/,$email,2;
     $email_header .= "\n\n";
@@ -1629,77 +1949,97 @@ sub PrintEmailStatistics
 # A boolean for whether the header matches the pattern.
 # A boolean for whether the header has the correct date.
 
-sub AnalyzeHeader($$)
+# It turns out that -h, -b, -d, -s , -f, and -v have some nasty feature
+# interaction. The easy cases are when a constraint is not met--either we skip
+# if -v is not specified, or we print if -v is specified.
+#
+# If a constraint *is* met, we can still do an early abort of there are no other
+# constraints, or if we know the values of previously checked constraints.
+#
+# Finally, -b must be taken into account when analyzing -h matching. Also, we
+# don't analyze the date here because it is too darn slow.
+sub AnalyzeHeader
 {
   my $email_header = shift;
+  my $email = shift;
   my $fileHandle = shift;
   my $pattern = shift;
+  my $doHeaderMatch = shift;
 
-  # See if the header matches the pattern
-  # Avoid perl 5.6 bug which causes spurious warning even though $pattern is
-  # defined.
-  local $^W = 0 if $] >= 5.006 && $] < 5.8;
-  my $matchesHeader = Check_For_Header_Match($email_header,$pattern);
+  # See if the email fails the status flag restriction
+  my $matchesStatus = 1;
+  if ($opts{'f'})
+  {
+    foreach my $flag (split //,$opts{'f'})
+    {
+      $matchesStatus = 0 unless $$email_header =~ /^Status: .*(?i:$flag)/m;
+    }
 
-  # See if the email failed the size restriction. If it passes here, we still
-  # don't know if the entire length of the email is too long.
-  my $matchesSize = length $email_header < $opts{'s'};
+    # Easy cases
+    return ($SKIP,0)  if !$opts{'v'} && !$matchesStatus;
+    return ($PRINT,1) if  $opts{'v'} && !$matchesStatus;
 
-  # At this point, we might know enough to print the email, or call for an
-  # early abort. See the documentation at the top for information. These
-  # conditions have been simplified to save space at the cost of clarity.
-  # Also, all date related conditions have been taken out, and will be handled
-  # after the pattern is searched for in the body of the email. This is
-  # because searching for the pattern is a lot faster than handling the date,
-  # and we don't have to handle the date if the pattern isn't found.
-  
-  # First handle the situations where a date constraint isn't a factor.
-  return ($PRINT,1) if (
-      (!$opts{'b'} &&  $opts{'h'} && !$opts{'s'} && !defined $opts{'d'} &&
-       !$opts{'v'} && $matchesHeader) ||
-      (                $opts{'h'} &&  $opts{'s'} && !defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesHeader || !$matchesSize)) ||
-      (                !$opts{'h'} &&  $opts{'s'} && !defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesSize)) ||
-      (                $opts{'h'} && !$opts{'s'} && !defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesHeader)) ||
+    # If we know there are no other constraints
+    return ($PRINT,1) if !$opts{'v'} &&  $matchesStatus &&
+      !$opts{'s'} && !defined $opts{'d'} && $pattern eq '.';
+    return ($SKIP,0)  if  $opts{'v'} &&  $matchesStatus &&
+      !$opts{'s'} && !defined $opts{'d'} && $pattern eq '.';
+  }
 
-      (                $opts{'h'} &&  $opts{'s'} &&  defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesHeader || !$matchesSize)) ||
-      (               !$opts{'h'} &&  $opts{'s'} &&  defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesSize)) ||
-      (                $opts{'h'} && !$opts{'s'} &&  defined $opts{'d'} &&
-        $opts{'v'} && (!$matchesHeader))
-    );
+  # See if the email header fails the size restriction.
+  my $matchesSize = 1;
+  if ($opts{'s'})
+  {
+    $matchesSize = 0 if length $$email >= $opts{'s'};
 
-  return ($SKIP,0) if (
-      (                $opts{'h'} &&  $opts{'s'} && !defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesHeader || !$matchesSize)) ||
-      (               !$opts{'h'} &&  $opts{'s'} && !defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesSize)) ||
-      (                $opts{'h'} && !$opts{'s'} && !defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesHeader)) ||
-      (!$opts{'b'} &&  $opts{'h'} && !$opts{'s'} && !defined $opts{'d'} &&
-        $opts{'v'} && ($matchesHeader)) ||
+    # Easy cases
+    return ($SKIP,0)  if !$opts{'v'} && !$matchesSize;
+    return ($PRINT,1) if  $opts{'v'} && !$matchesSize;
 
-      (                $opts{'h'} &&  $opts{'s'} &&  defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesHeader || !$matchesSize)) ||
-      (               !$opts{'h'} &&  $opts{'s'} &&  defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesSize)) ||
-      (                $opts{'h'} && !$opts{'s'} &&  defined $opts{'d'} &&
-       !$opts{'v'} && (!$matchesHeader))
-    );
+    # If we know there are no other constraints, or we know their values
+    return ($PRINT,1) if !$opts{'v'} &&  $matchesSize &&
+      $matchesStatus && !defined $opts{'d'} && $pattern eq '.';
+    return ($SKIP,0)  if  $opts{'v'} &&  $matchesSize &&
+      $matchesStatus && !defined $opts{'d'} && $pattern eq '.';
+  }
 
-  return ($CONTINUE,$matchesHeader);
+  if ($doHeaderMatch)
+  {
+    # See if the header matches the pattern
+    # Avoid perl 5.6 bug which causes spurious warning even though $pattern is
+    # defined.
+    local $^W = 0 if $] >= 5.006 && $] < 5.8;
+    my $matchesHeader = Header_Matches_Pattern($email_header,$pattern);
+
+    if ($opts{'h'})
+    {
+      # Easy cases
+      return ($SKIP,0)  if !$opts{'v'} && !$matchesHeader;
+      return ($PRINT,1) if  $opts{'v'} && !$matchesHeader;
+    }
+
+    # If we know there are no other constraints, or we know their values
+    return ($PRINT,1) if !$opts{'v'} &&  $matchesHeader &&
+      $matchesSize && $matchesStatus && !defined $opts{'d'} && !$opts{'b'};
+    return ($SKIP,0)  if  $opts{'v'} &&  $matchesHeader &&
+      $matchesSize && $matchesStatus && !defined $opts{'d'} && !$opts{'b'};
+
+
+    return ($CONTINUE,$matchesHeader);
+  }
+  else
+  {
+    return ($CONTINUE,1);
+  }
 }
 
 #-------------------------------------------------------------------------------
 
 my $header_pattern = undef;
 
-sub Check_For_Header_Match
+sub Header_Matches_Pattern
 {
-  my $email_header = shift;
+  my $email_header = ${shift @_};
   my $pattern = shift;
 
   return ($email_header =~ /$pattern/om) || 0 unless $opts{'Y'};
@@ -1828,7 +2168,7 @@ sub PrintEmail
 # date specification can be $NODATE, meaning that the email doesn't have
 # a Date: line.
 
-sub CheckDate($)
+sub Email_Matches_Date($)
 {
   my $header = ${shift @_};
   my ($emailDate, $isInDate);
@@ -2024,14 +2364,17 @@ grepmail $VERSION
 
 usage:
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] <files...>
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    <files...>
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <pattern>] <files...>
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    [[-e] <pattern>] <files...>
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [-E <expr>] <files...>
+  grepmail [--help|--version] [-abBDFhHilmrRuvV] [-f status] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    [-E <expr>] <files...>
 
 At least one of -s, -d, -u, -e, and -E must be specified, and can appear in
 any relative order following the other flags. The -e flag is optional if
@@ -2046,6 +2389,8 @@ compressed ASCII input is taken from STDIN.
 -D Debug mode
 -e Explicitly name pattern (when searching for strings beginning with "-")
 -E Specify a complex search expression
+-f Search must match status (A=answered, R=read, D=deleted, O=old, F=flagged)
+-F Force processing of mailboxes which appear to be binary
 -h Search must match header
 -H Print headers but not bodies of matching emails
 -i Ignore case in the search expression
@@ -2065,14 +2410,14 @@ compressed ASCII input is taken from STDIN.
 -V Display the version number
 -X Specify a regular expression for the signature separator
 -Y Specify a header to search (implies -h)
--Z Not use Mail::Folder::FastReader even if it is on the system
 --help Print a help message
 
-Date specifications must be of the form of:
-a date like "today", "1st thursday in June 1992" (requires Date::Manip),
+Date constraints require Date::Parse. Date specifications must be of the
+form of:
+- a date like "today", "1st thursday in June 1992" (requires Date::Manip),
   "05/18/93", "12:30 Dec 12th 1880", "8:00pm december tenth",
-OR "before", "after", or "since", followed by a date as defined above,
-OR "between <date> and <date>", where <date> is defined as above.
+- "before", "after", or "since", followed by a date as defined above,
+- "between <date> and <date>", where <date> is defined as above.
 EOF
 }
 
@@ -2084,14 +2429,17 @@ grepmail - search mailboxes for mail matching a regular expression
 
 =head1 SYNOPSIS
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] <files...>
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    <files...>
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [[-e] <pattern>] <files...>
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    [[-e] <pattern>] <files...>
 
-  grepmail [--help] [-abBDhHilmrRuv] [-s size] [-d <date-specification>]
-    [-X <signature-pattern>] [-Y <header-pattern>] [-E <expr>] <files...>
+  grepmail [--help|--version] [-abBDhHilmrRuvV] [-s size]
+    [-d <date-specification>] [-X <signature-pattern>] [-Y <header-pattern>]
+    [-E <expr>] <files...>
 
 =head1 DESCRIPTION
 
@@ -2195,6 +2543,12 @@ use (and perhaps at the expense of reduced functionality).
 Explicitly specify the search pattern. This is useful for specifying patterns
 that begin with "-", which would otherwise be interpreted as a flag.
 
+=item B<-f>
+
+Asserts that the email "Status:" header must contain the given flags. Order
+and case are not important, so use I<-f AR> or I<-f ra> to search for emails
+which have been read and answered.
+
 =item B<-F>
 
 Force processing of ASCII files which don't appear to be mailboxes.
@@ -2267,6 +2621,10 @@ Invert the sense of the search, by analogy to I<grep -v>. This results in the
 set of emails printed being the complement of those that would be printed
 without the B<-v> switch.
 
+=item B<-V>
+
+Print the version and exit.
+
 =item B<-X>
 
 Specify a regular expression for the signature separator. By default this
@@ -2296,11 +2654,6 @@ If  the regular expression contains "^FROM_MAILER:" it will be substituted by
 "^FROM_DAEMON:"), which should catch mails coming from most mailer-daemons.
 
 =back
-
-=item B<-Z>
-
-By default, grepmail uses the Mail::Folder::FastReader module if it is on the
-system. This switch tells it to use the slower Perl implementation instead.
 
 =item B<--help>
 
