@@ -1,3 +1,20 @@
+New in version 4.30:
+- Updated code to avoid warnings under Perl 5.6 (Thanks to Andreas Kutschera
+  <Andreas.Kutschera@bln.siemens.de> for the bug report.)
+- Fixed a bug in the test script where bzip2, gzip, and tzip support would not
+  be tested even though the programs were available. (Thanks to Andreas
+  Kutschera <Andreas.Kutschera@bln.siemens.de> for the patch.)
+- Added standard --help flag (Patch by Seth Cohn <seth@oregonmed.net>)
+- Added -u ("unique") flag, which ensures that no duplicate messages will be
+  output. (A BIG thanks to Seth Cohn <seth@oregonmed.net>.)
+
+New in version 4.23:
+- Updated the test cases to work better in timezones close to +0000 and +2300.
+  (email if you have problems with tests 1 and 23. Thanks to Harald Krause
+  <harald.krause@a-city.de> for first finding the bug, and Adam Huffman
+  <adam.huffman@man.ac.uk> for his help debugging it.)
+- Fixed a bug in the "ignore attachments" code
+
 New in version 4.22:
 - grepmail now behaves better when tzip, bzip2 or gunzip aren't present on the
   system.

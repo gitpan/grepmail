@@ -4,17 +4,20 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.22:
-- grepmail now behaves better when tzip, bzip2 or gunzip aren't present on the
-  system.
-- The code has been restructured to compile more easily with perlcc.
+New in version 4.30:
+- Updated code to avoid warnings under Perl 5.6
+- Fixed a bug in the test script where bzip2, gzip, and tzip support would
+  not be tested even though the programs were available.
+- Added standard --help flag
+- Added -u ("unique") flag, which ensures that no duplicate messages
+  will be output.
 
-New in version 4.21:
-- Fixed a bug that would cause grepmail to runaway when a pipe following it
-  was broken. (Thanks to Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at> for the
-  bug report
+New in version 4.23:
+- Updated the test cases to work better in timezones close to +0000 and +2300.
+  (email if you have problems with tests 1 and 23.)
+- Fixed a bug in the "ignore attachments" code
 
-See the file CHANGES for a complete change history.
+See the file CHANGES for a complete change history and credits.
 
 
 INSTALLATION

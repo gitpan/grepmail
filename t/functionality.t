@@ -15,7 +15,7 @@ use strict;
 use Test;
 
 my @tests = (
-'grepmail library -d "before July 8 1998" t/mailarc-1.txt',
+'grepmail library -d "before July 9 1998" t/mailarc-1.txt',
 'grepmail -v "(library|job)" t/mailarc-1.txt',
 'grepmail -b mime t/mailarc-1.txt',
 'grepmail -h Wallace t/mailarc-1.txt',
@@ -46,6 +46,9 @@ my @tests = (
 'cat no_such_file 2>/dev/null | grepmail library',
 'grepmail -d "after armageddon" library t/mailarc-1.txt',
 'grepmail library -s 2000 t/mailarc-1.txt',
+'grepmail library -u t/mailarc-1.txt',
+'grepmail -u t/mailarc-1.txt',
+'grepmail -bi imagecraft -u t/mailarc-1.txt',
 );
 
 # Tests for certain supported options.
@@ -65,18 +68,20 @@ my $tzip = 0;
 {
   my $temp;
 
-  # Save old STDERR and redirect temporarily to nothing
+  # Save old STDERR and redirect temporarily to nothing. This will prevent the
+  # test script from emitting a warning if the backticks can't find the
+  # compression programs
   use vars qw(*OLDSTDERR);
   open OLDSTDERR,">&STDERR" or die "Can't save STDOUT: $!\n";
   open STDERR,">/dev/null" or die "Can't redirect STDOUT to /dev/null: $!\n";
 
-  $temp = `bzip2 -h`;
+  $temp = `bzip2 -h 2>&1`;
   $bzip2 = 1 if $temp =~ /usage/;
 
-  $temp = `gzip -h`;
+  $temp = `gzip -h 2>&1`;
   $gzip = 1 if $temp =~ /usage/;
 
-  $temp = `tzip -h`;
+  $temp = `tzip -h 2>&1`;
   $tzip = 1 if $temp =~ /usage/;
 
   open STDERR,">&OLDSTDERR" or die "Can't restore STDOUT: $!\n";
@@ -135,7 +140,7 @@ foreach my $test (@tests)
     print "Succeeded.\n";
     ok(1);
 
-    unlink "t/results/test$testNumber.out";
+#    unlink "t/results/test$testNumber.out";
     unlink "t/results/test$testNumber.diff";
   }
 }

@@ -70,6 +70,7 @@ WriteMakefile(
   #'VERSION' => $VERSION,
 
   'dist'  => { COMPRESS => 'gzip -9', SUFFIX => 'gz' },
+  'clean' => { FILES => 'grepmail' },
   'EXE_FILES' => \@exe_files,
   'PREREQ_PM' => \%prereqs,
 );

@@ -1,8 +1,8 @@
-grepmail 4.22
+grepmail 4.30
 
-usage: grepmail [-bDhilmrRv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
+usage: grepmail [-bDhilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
 
-At least one of -s, -d, and -e must be specified, and can appear in any
+At least one of -s, -d, -u, and -e must be specified, and can appear in any
 relative order following the other flags. The -e flag is optional if expr
 appears immediately before -s or -d. Files can be plain ASCII or ASCII files
 compressed with gzip, tzip, or bzip2. If no file is provided, normal or
@@ -23,6 +23,7 @@ compressed ASCII input is taken from STDIN.
    expression
 -R Recurse directories
 -s Restrict results to emails less than a certain size (in bytes)
+-u Ensure that no duplicate emails are output
 -v Output emails that don't match the expression
 
 Date specifications must be of the form of:
