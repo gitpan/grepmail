@@ -1,3 +1,10 @@
+New in version 4.43:
+- Fixed a bug in -r counting when used with -h. (Thanks to Andrew
+  <andrew@ugh.net.au> for the bug report.)
+- Fixed a bug in the handling of included messages. (Thanks to Antoine
+  Martin <antonus@libertysurf.fr> for the bug report and suggestion
+  for the fix.)
+
 New in version 4.42:
 - Added -a flag to use received date instead of sent date for -d matches.
   (Thanks to Michael Liljeblad <liljeblad at users.sourceforge.net> for the
@@ -9,10 +16,12 @@ New in version 4.42:
   treat the email as a match (Thanks to David Blaine <blained at
   users.sourceforge.net> for the bug report.)
 - -d "" can be used to find emails without dates
-- Mailbox files are now detected as files using if ($buffer =~
-  /^(X-From-Line:|From) /im && $buffer =~ /^Subject: /im) rather than if
-  ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Date: /im)
-- Improved detection of binary files
+- Mailbox files are now detected as files using
+  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Subject: /im)
+  rather than
+  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Date: /im)
+- Improved detection of binary files. (Thanks to Dan Sugalski
+  <dan@tuatha.sidhe.org> for the sample code.)
 - STDERR and STDOUT now checked separately during "make test"
 - Headers can now be in the format "Date:<tab>" in addition to "Date: "
   (Thanks to Benjamin Korvemaker <korvemaker at users.sourceforge.net> for the

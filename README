@@ -4,17 +4,23 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.41:
-- Support for Gnus-style mail files added 
-- Test mail files tweaked to make the test cases work better across all time
-  zones. 
-- Added check for unparsable dates in email headers.
-- Fixed a Perl warning raised when date parsing fails.
-- Added instructions for getting the necessary modules to README.
+New in version 4.43:
+- Fixed a bug in -r counting when used with -h.
+- Fixed a bug in the handling of included messages.
 
-New in version 4.40:
-- Date::Parse and Date::Manip version unified -- Date::Parse is now required,
-  and Date::Manip (if present) is used to parse complex dates
+New in version 4.42:
+- Added -a flag to use received date instead of sent date for -d matches.
+- Included emails are now ignored properly
+- If an email has no date, the -d switch now issues a warning and does not
+  treat the email as a match
+- -d "" can be used to find emails without dates
+- Mailbox files are now detected as files using 
+  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Subject: /im)
+  rather than
+  if ($buffer =~ /^(X-From-Line:|From) /im && $buffer =~ /^Date: /im)
+- Improved detection of binary files
+- STDERR and STDOUT now checked separately during "make test"
+- Headers can now be in the format "Date:<tab>" in addition to "Date: "
 
 See the file CHANGES for a complete change history and credits.
 
@@ -50,7 +56,9 @@ On Non-Windows systems:
 
 If make test fails, please run "perl t/functionality.t" and see which test(s)
 are failing. Please email the output of running the particular test with the
--D flag to the address below.
+-D flag (e.g.:
+  blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt
+to the address below.
 
 On Windows systems:
 - Just copy "grepmail" to a place in your path

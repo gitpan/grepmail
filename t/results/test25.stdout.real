@@ -1,4 +1,4 @@
-grepmail 4.42
+grepmail 4.43
 
 usage: grepmail [-abDhilmrRuv] [-s size] [-d "datespec"] [[-e] <expr>] <files...>
 
