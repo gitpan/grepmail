@@ -1,3 +1,24 @@
+New in version 4.7:
+- Fixed signal handling to make grepmail easier to debug. Thanks to Ilya
+  Zakharevich for providing the solution.
+- Fixed a possible performance problem in reading of emails (Perl
+  implementation), and documented the settings in the README.
+- Expanded the pattern for matching the start of emails to allow different
+  types of emails to be parsed.
+- Fixed a bug where -R was reported as not recognized. (Thanks to Nicholas
+  Riley <nriley@sf.net> for the bug report and fix.)
+- "anonymize_mailbox" utility included to help people submit bug reports
+- If a mailbox can not be found, grepmail now searches the $home/mail,
+  $home/Mail, $home/Mailbox directories (or the directory specified by the
+  MAIL environment variable). (Thanks to Michael Friendly <friendly@yorku.ca>
+  for the feature suggestion and initial patch.)
+- Added -X flag to allow the user to specify a pattern for the signature
+  separator. (Thanks to Michael Friendly <friendly@yorku.ca> for the feature
+  suggestion.)
+- Added -Y flag to search specific headers. (Thanks to Terry Jones
+  <terry@eatoni.com> for the idea to automatically wrap header lines as
+  necessary.)
+
 New in version 4.60:
 - Removed -B flag and added -S flag. -B is now performed using -bS.
 - Added installation flags to suppress interactive installation. (Thanks to

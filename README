@@ -4,20 +4,21 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.60:
+New in version 4.70:
 
-- Removed -B flag and added -S flag. -B is now performed using -bS.
-- Added installation flags to suppress interactive installation. (Thanks to
-  Joey Hess for the problem report. He had to patch Makefile.PL for his Debian
-  packaging.)
-- Fixed a slow implementation of searching for signatures that would cause
-  grepmail to crawl for very large emails. Thanks to Joey Hess for discovering
-  the inefficiency.
-- Fixed a short-circuit which should have bypassed the search for signatures
-  if -B was not specified. Thanks to Joey Hess for finding the bug.
-- Implemented a new Perl parser which is 5% to 50% faster depending on how
-  I/O-bound your system is.
-- Restructured the code a bit and improved detection of invalid arguments.
+- Fixed signal handling to make grepmail easier to debug.
+- Fixed a possible performance problem in reading of emails (Perl
+  implementation), and documented the settings in the README.
+- Expanded the pattern for matching the start of emails to allow different
+  types of emails to be parsed.
+- Fixed a bug where -R was reported as not recognized.
+- "anonymize_mailbox" utility included to help people submit bug reports
+- If a mailbox can not be found, grepmail now searches the $home/mail,
+  $home/Mail, $home/Mailbox directories (or the directory specified by the
+  MAIL environment variable).
+- Added -X flag to allow the user to specify a pattern for the signature
+  separator.
+- Added -Y flag to search specific headers.
 
 
 MODULE DEPENDENCIES
@@ -73,6 +74,22 @@ If make test fails, please see the INSTALLATION PROBLEMS section below.
   "grepmail.pl" if you've associated .pl files with perl.exe.
 
 
+CONFIGURATION
+
+You may want to set your MAIL environment variable so that grepmail will know
+the default location to search for mailboxes.
+
+If you are terribly concerned about performance, you may want to modify the
+value of the variable READ_CHUNK_SIZE located in the code. This variable
+controls how much text is read from the mailbox at a time. If the value is set
+to 0, the entire file is read into memory. (There is no user-visible option
+for setting this value.)
+
+If you frequently use the same set of flags, you may wish to alias "grepmail"
+to "grepmail -flags" within your command interpreter (shell). See the
+documentation for your shell for details on how to do this.
+
+
 INSTALLATION PROBLEMS
 
 If "make test" fails, run
@@ -93,6 +110,8 @@ may be the case that Date::Manip does not support your timezone yet. Try this:
 
 If you get an error, contact the author of Date::Manip.
 
+For other bugs, see the section REPORTING BUGS below.
+
 
 DOCUMENTATION
 
@@ -108,19 +127,19 @@ discussion forums, CVS access, and more.
 
 REPORTING BUGS
 
-You can report bugs at http://sourceforge.net/bugs/?group_id=2207. If the test
-suite is failing, please attach the .stdout and .stderr files for the test
-case(s), which are located in t/results. If this is a bug not in the test
-suite, please attach the output of running grepmail with the -D switch.
-
-NOTE: If you get a warning which says "Use of uninitialized value in pattern
-match (m//)", check your version of Perl (perl -v). If you're using version
-5.6.0, you will need to upgrade.
+You can report bugs at http://sourceforge.net/bugs/?group_id=2207.  Please
+attach the output of running grepmail with the -D switch. If the bug is
+related to processing of a particular mailbox, try to trim the mailbox to the
+smallest set of emails that still exhibit the problem.  Then use the
+"anonymize_mailbox" program that comes with grepmail to remove any sensitive
+information, and attach the mailbox to the bug report.
 
 
 PRIMARY AUTHOR
 
-Written by David Coppit (david@coppit.org, http://coppit.org/)
+Written by David Coppit (david@coppit.org, http://coppit.org/), with the
+generous help of many kind people. See the file CHANGES for detailed
+information.
 
 
 LICENSE
