@@ -4,13 +4,8 @@ Grepmail searches a normal, gzip'd, bzip'd, or tzip'd mailbox for a given
 regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
-New in version 4.48:
-- Mail::Folder::FastReader migrated from XS to Inline.
-- -H flag added (print headers only)
-- Error messages are localized in test cases.
-- Fixed a problem with timezones in the test cases.
-- Added a check in the test cases for determining if the user's timezone is
-  not recognized by Date::Manip.
+New in version 4.50:
+- Added X-Draft-From to support newer versions of Gnus 
 
 NOTE: I have received a report that Mail::Folder::FastReader may fail for
 very large mailboxes (>300MB). I have been unable to reproduce this bug so
@@ -29,7 +24,7 @@ Starting with version 4.44, an additional module is distributed with
 grepmail, called Mail::Folder::FastReader. It implements the email
 reading capability in C for 10-20% faster execution, depending on your
 system. This module is compiled and installed during the installation
-of grepmail. (See below)
+of grepmail (see below). You will need Inline version 0.41 or better.
 
 The Date::Parse module is part of the TimeDate distribution, which can be
 downloaded from:

@@ -1,3 +1,14 @@
+New in version 4.50:
+- Added X-Draft-From to support newer versions of Gnus (Thanks to Nevin Kapur
+  <nevin@jhu.edu> for the patch).
+
+New in version 4.49:
+- Fixed test cases to work around PATH modifications made by Date::Manip
+- Added -B to search the body but not the signature. (Thanks to Helmut
+  Springer <delta@faveve.uni-stuttgart.de> for the feature request.)
+- Added LICENSE file. (Thanks to Janet Casey <jcasey@gnu.org> for the
+  reminder.)
+
 New in version 4.48:
 - Mail::Folder::FastReader migrated from XS to Inline.
 - -H flag added by Nevin Kapur <nevin@jhu.edu>
