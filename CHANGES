@@ -1,9 +1,18 @@
 New in version 4.48:
+- Mail::Folder::FastReader migrated from XS to Inline.
+- -H flag added by Nevin Kapur <nevin@jhu.edu>
+- Error messages are localized in test cases. (Thanks to cpan-testers and in
+  particular Jost Krieger <Jost.Krieger@ruhr-uni-bochum.de> for finding this
+  bug and diagnosing it.)
+- Fixed a problem with timezones in the test cases. (Thanks to Roy Lanek
+  <lanek@ranahminang.net> for helping me debug this.)
+- Added a check in the test cases for determining if the user's timezone is
+  not recognized by Date::Manip.
+
+New in version 4.47:
 - Grepmail now converts Gnus emails into mbox emails before printing them.
   (Thanks to Johan Vromans <JVromans@squirrel.nl> for supplying a patch and
   explaining the need for it.
-
-New in version 4.47:
 - Fixed a couple bugs in -M processing
 - -M is now 19% faster. (It's now only about 9% slower than without -M.)
 

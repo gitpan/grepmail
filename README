@@ -5,11 +5,17 @@ regular expression, and returns those emails that match it. Piped input is
 allowed, and date and size restrictions are supported.
 
 New in version 4.48:
-- Grepmail now converts Gnus emails into mbox emails before printing them.
+- Mail::Folder::FastReader migrated from XS to Inline.
+- -H flag added (print headers only)
+- Error messages are localized in test cases.
+- Fixed a problem with timezones in the test cases.
+- Added a check in the test cases for determining if the user's timezone is
+  not recognized by Date::Manip.
 
-New in version 4.47:
-- Fixed a couple bugs in -M processing
-- -M is now 19% faster. (It's now only about 9% slower than without -M.)
+NOTE: I have received a report that Mail::Folder::FastReader may fail for
+very large mailboxes (>300MB). I have been unable to reproduce this bug so
+far, and suspect that the very large mailbox has a particular email that is
+problematic.
 
 
 MODULE DEPENDENCIES
@@ -60,6 +66,13 @@ the particular test with the -D flag (e.g.:
   blib/script/grepmail library -D -d "before July 9 1998" t/mailarc-1.txt
 
 to the address below.
+
+If you see errors about your timezone, and you are in an uncommon timezone, it
+may be the case that Date::Manip does not support your timezone yet. Try this:
+
+  perl -MDate::Manip -e 'print "TIMEZONE: ".&Date::Manip::Date_TimeZone."\n"'
+
+If you get an error, contact the author of Date::Manip.
 
 => On Windows systems:
 
