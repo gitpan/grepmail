@@ -1,3 +1,6 @@
+New in version 4.31:
+- Distro has missing test cases for -u functionality. Doh!
+
 New in version 4.30:
 - Updated code to avoid warnings under Perl 5.6 (Thanks to Andreas Kutschera
   <Andreas.Kutschera@bln.siemens.de> for the bug report.)

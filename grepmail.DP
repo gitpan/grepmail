@@ -2,7 +2,7 @@
 
 # grepmail
 
-$VERSION = '4.30';
+$VERSION = '4.31';
 
 # Grepmail searches a normal, gzip'd, tzip'd, or bzip2'd mailbox for a given
 # regular expression and returns those emails that match the query. It also
