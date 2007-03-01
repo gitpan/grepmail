@@ -1151,9 +1151,7 @@ sub Process_Mail_File
   $modified_pattern =~ s#\$([^\w]|$)#$/$1#;
 
   # This is the main loop. It's executed once for each email
-  # Direct access for performance reasons
-  #while($folder_reader->end_of_file())
-  while(!$folder_reader->{'end_of_file'})
+  while(!$folder_reader->end_of_file())
   {
     dprint "Reading email" if $opts{'D'};
 
