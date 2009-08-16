@@ -1,7 +1,8 @@
-#line 1 "inc/Module/Install/CustomInstallationPath.pm - /Library/Perl/5.8.1/Module/Install/CustomInstallationPath.pm"
+#line 1
 package Module::Install::CustomInstallationPath;
 
 use strict;
+use 5.004;
 use File::HomeDir;
 use Config;
 
@@ -10,16 +11,14 @@ use vars qw( @ISA $VERSION );
 use Module::Install::Base;
 @ISA = qw( Module::Install::Base );
 
-$VERSION = '0.10.3';
+$VERSION = sprintf "%d.%02d%02d", q/0.10.40/ =~ /(\d+)/g;
 
 # ---------------------------------------------------------------------------
 
-sub Check_Custom_Installation
+sub check_custom_installation
 {
   my $self = shift;
 
-  # Module::Install says it requires perl 5.004
-  $self->requires( perl => '5.004' );
   $self->include_deps('File::HomeDir',0);
 
   return if (grep {/^PREFIX=/} @ARGV) || (grep {/^INSTALLDIRS=/} @ARGV);
@@ -48,5 +47,4 @@ sub Check_Custom_Installation
 
 # ---------------------------------------------------------------------------
 
-#line 106
-
+#line 109

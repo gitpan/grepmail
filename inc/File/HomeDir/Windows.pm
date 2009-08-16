@@ -1,4 +1,4 @@
-#line 1 "inc/File/HomeDir/Windows.pm - /Library/Perl/5.8.6/File/HomeDir/Windows.pm"
+#line 1
 package File::HomeDir::Windows;
 
 # Generalised implementation for the entire Windows family of operating
@@ -11,7 +11,7 @@ use File::Spec ();
 
 use vars qw{$VERSION};
 BEGIN {
-	$VERSION = '0.58';
+	$VERSION = '0.69';
 }
 
 # If prefork is available, set Win32::TieRegistry
@@ -28,19 +28,26 @@ eval "use prefork 'Win32::TieRegistry'";
 sub my_home {
 	my $class = shift;
 
+	# A lot of unix people and unix-derived tools rely on
+	# the ability to overload HOME. We will support it too
+	# so that they can replace raw HOME calls with File::HomeDir.
+	if ( exists $ENV{HOME} and $ENV{HOME} ) {
+		return $ENV{HOME};
+	}
+
 	# Do we have a user profile?
-	if ( $ENV{USERPROFILE} ) {
+	if ( exists $ENV{USERPROFILE} and $ENV{USERPROFILE} ) {
 		return $ENV{USERPROFILE};
 	}
 
 	# Some Windows use something like $ENV{HOME}
-	if ( $ENV{HOMEDRIVE} and $ENV{HOMEPATH} ) {
+	if ( exists $ENV{HOMEDRIVE} and exists $ENV{HOMEPATH} and $ENV{HOMEDRIVE} and $ENV{HOMEPATH} ) {
 		return File::Spec->catpath(
 			$ENV{HOMEDRIVE}, $ENV{HOMEPATH}, '',
 			);
 	}
 
-	Carp::croak("Could not locate current user's home directory");
+	return undef;
 }
 
 sub my_desktop {
@@ -48,8 +55,8 @@ sub my_desktop {
 
 	# The most correct way to find the desktop
 	SCOPE: {
-		my $home = $class->my_win32_folder('Desktop');
-		return $home if $home and -d $home;
+		my $dir = $class->my_win32_folder('Desktop');
+		return $dir if $dir and -d $dir;
 	}
 
 	# MSWindows sets WINDIR, MS WinNT sets USERPROFILE.
@@ -61,16 +68,19 @@ sub my_desktop {
 
 	# As a last resort, try some hard-wired values
 	foreach my $fixed (
+		# The reason there are both types of slash here is because
+		# this set of paths has been kept from thethe original version
+		# of File::HomeDir::Win32 (before it was rewritten).
+		# I can only assume this is Cygwin-related stuff.
 		"C:\\windows\\desktop",
 		"C:\\win95\\desktop",
-		# In the original, I can only assume this is Cygwin stuff
 		"C:/win95/desktop",
 		"C:/windows/desktop",
 	) {
-		return $fixed if $fixed and -d $fixed;
+		return $fixed if -d $fixed;
 	}
 
-	Carp::croak("Failed to find current user's desktop");
+	return undef;
 }
 
 sub my_documents {
@@ -78,11 +88,11 @@ sub my_documents {
 
 	# The most correct way to find my documents
 	SCOPE: {
-		my $home = $class->my_win32_folder('Personal');
-		return $home if $home and -d $home;
+		my $dir = $class->my_win32_folder('Personal');
+		return $dir if $dir and -d $dir;
 	}
 
-	Carp::croak("Failed to find current user's documents");
+	return undef;
 }
 
 sub my_data {
@@ -90,11 +100,47 @@ sub my_data {
 
 	# The most correct way to find my documents
 	SCOPE: {
-		my $home = $class->my_win32_folder('Local AppData');
-		return $home if $home and -d $home;
+		my $dir = $class->my_win32_folder('Local AppData');
+		return $dir if $dir and -d $dir;
 	}
 
-	Carp::croak("Failed to find current user's documents");
+	return undef;
+}
+
+sub my_music {
+	my $class = shift;
+
+	# The most correct way to find my music
+	SCOPE: {
+		my $dir = $class->my_win32_folder('My Music');
+		return $dir if $dir and -d $dir;
+	}
+
+	return undef;
+}
+
+sub my_pictures {
+	my $class = shift;
+
+	# The most correct way to find my pictures
+	SCOPE: {
+		my $dir = $class->my_win32_folder('My Pictures');
+		return $dir if $dir and -d $dir;
+	}
+
+	return undef;
+}
+
+sub my_videos {
+	my $class = shift;
+
+	# The most correct way to find my videos
+	SCOPE: {
+		my $dir = $class->my_win32_folder('My Video');
+		return $dir if $dir and -d $dir;
+	}
+
+	return undef;
 }
 
 # The explorer shell holds all sorts of folder information.
@@ -115,31 +161,5 @@ sub my_win32_folder {
 	return $folder;
 }
 
-
-
-
-
-#####################################################################
-# General User Methods
-
-sub users_home {
-	my ($class, $name) = @_;
-	Carp::croak("users_home is not implemented on this platform");
-}
-
-sub users_documents {
-	my ($class, $name) = @_;
-	Carp::croak("users_documents is not implemented on this platform");
-}
-
-sub users_data {
-	my ($class, $name) = @_;
-	Carp::croak("users_data is not implemented on this platform");
-}
-
-sub users_desktop {
-	my ($class, $name) = @_;
-	Carp::croak("users_desktop is not implemented on this platform");
-}
-
 1;
+

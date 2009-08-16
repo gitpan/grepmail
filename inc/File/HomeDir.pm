@@ -1,4 +1,4 @@
-#line 1 "inc/File/HomeDir.pm - /Library/Perl/5.8.6/File/HomeDir.pm"
+#line 1
 package File::HomeDir;
 
 # See POD at end for docs
@@ -11,18 +11,28 @@ use File::Spec ();
 # Globals
 use vars qw{$VERSION @ISA @EXPORT @EXPORT_OK $IMPLEMENTED_BY};
 BEGIN {
-	$VERSION = '0.58';
+	$VERSION = '0.69';
 
 	# Inherit manually
 	require Exporter;
-	@ISA       = ( 'Exporter' );
-	@EXPORT    = ( 'home'     );
+	@ISA       = qw{ Exporter };
+	@EXPORT    = qw{ home     };
 	@EXPORT_OK = qw{
 		home
 		my_home
 		my_desktop
 		my_documents
+		my_music
+		my_pictures
+		my_videos
 		my_data
+		users_home
+		users_desktop
+		users_documents
+		users_music
+		users_pictures
+		users_videos
+		users_data
 		};
 
 	# %~ doesn't need (and won't take) exporting, as it's a magic
@@ -31,15 +41,22 @@ BEGIN {
 
 # Don't do platform detection at compile-time
 if ( $^O eq 'MSWin32' ) {
+	# All versions of Windows
 	$IMPLEMENTED_BY = 'File::HomeDir::Windows';
 	require File::HomeDir::Windows;
+
 } elsif ( $^O eq 'darwin' ) {
+	# Modern Max OS X
 	$IMPLEMENTED_BY = 'File::HomeDir::Darwin';
 	require File::HomeDir::Darwin;
-} elsif ( $MacPerl::VERSION || $MacPerl::VERSION ) {
+
+} elsif ( $^O eq 'MacOS' ) {
+	# Legacy Mac OS
 	$IMPLEMENTED_BY = 'File::HomeDir::MacOS9';
 	require File::HomeDir::MacOS9;
+
 } else {
+	# Default to Unix semantics
 	$IMPLEMENTED_BY = 'File::HomeDir::Unix';
 	require File::HomeDir::Unix;
 }
@@ -56,15 +73,39 @@ sub my_home {
 }
 
 sub my_desktop {
-	$IMPLEMENTED_BY->my_desktop;
+	$IMPLEMENTED_BY->can('my_desktop')
+		? $IMPLEMENTED_BY->my_desktop
+		: Carp::croak("The my_desktop method is not implemented on this platform");
 }
 
 sub my_documents {
-	$IMPLEMENTED_BY->my_documents;
+	$IMPLEMENTED_BY->can('my_documents')
+		? $IMPLEMENTED_BY->my_documents
+		: Carp::croak("The my_documents method is not implemented on this platform");
+}
+
+sub my_music {
+	$IMPLEMENTED_BY->can('my_music')
+		? $IMPLEMENTED_BY->my_music
+		: Carp::croak("The my_music method is not implemented on this platform");
+}
+
+sub my_pictures {
+	$IMPLEMENTED_BY->can('my_pictures')
+		? $IMPLEMENTED_BY->my_pictures
+		: Carp::croak("The my_pictures method is not implemented on this platform");
+}
+
+sub my_videos {
+	$IMPLEMENTED_BY->can('my_videos')
+		? $IMPLEMENTED_BY->my_videos
+		: Carp::croak("The my_videos method is not implemented on this platform");
 }
 
 sub my_data {
-	$IMPLEMENTED_BY->my_data;
+	$IMPLEMENTED_BY->can('my_data')
+		? $IMPLEMENTED_BY->my_data
+		: Carp::croak("The my_data method is not implemented on this platform");
 }
 
 
@@ -73,6 +114,56 @@ sub my_data {
 
 #####################################################################
 # General User Methods
+
+sub users_home {
+	$IMPLEMENTED_BY->can('users_home')
+		? $IMPLEMENTED_BY->users_home( $_[-1] )
+		: Carp::croak("The users_home method is not implemented on this platform");
+}
+
+sub users_desktop {
+	$IMPLEMENTED_BY->can('users_desktop')
+		? $IMPLEMENTED_BY->users_desktop( $_[-1] )
+		: Carp::croak("The users_desktop method is not implemented on this platform");
+}
+
+sub users_documents {
+	$IMPLEMENTED_BY->can('users_documents')
+		? $IMPLEMENTED_BY->users_documents( $_[-1] )
+		: Carp::croak("The users_documents method is not implemented on this platform");
+}
+
+sub users_music {
+	$IMPLEMENTED_BY->can('users_music')
+		? $IMPLEMENTED_BY->users_music( $_[-1] )
+		: Carp::croak("The users_music method is not implemented on this platform");
+}
+
+sub users_pictures {
+	$IMPLEMENTED_BY->can('users_pictures')
+		? $IMPLEMENTED_BY->users_pictures( $_[-1] )
+		: Carp::croak("The users_pictures method is not implemented on this platform");
+}
+
+sub users_videos {
+	$IMPLEMENTED_BY->can('users_videos')
+		? $IMPLEMENTED_BY->users_videos( $_[-1] )
+		: Carp::croak("The users_videos method is not implemented on this platform");
+}
+
+sub users_data {
+	$IMPLEMENTED_BY->can('users_data')
+		? $IMPLEMENTED_BY->users_data( $_[-1] )
+		: Carp::croak("The users_data method is not implemented on this platform");
+}
+
+
+
+
+
+
+#####################################################################
+# Legacy Methods
 
 # Find the home directory of an arbitrary user
 sub home (;$) {
@@ -124,8 +215,13 @@ CLASS: {
 	sub TIEHASH { $SINGLETON }
 
 	sub FETCH {
+		# Catch a bad username
+		unless ( defined $_[1] ) {
+			Carp::croak("Can't use undef as a username");
+		}
+
 		# Get our homedir
-		if ( ! defined $_[1] or ! length $_[1] ) {
+		unless ( length $_[1] ) {
 			return File::HomeDir::my_home();
 		}
 
@@ -152,4 +248,4 @@ tie %~, 'File::HomeDir::TIE';
 
 __END__
 
-#line 372
+#line 612

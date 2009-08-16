@@ -1,4 +1,4 @@
-#line 1 "inc/File/HomeDir/MacOS9.pm - /Library/Perl/5.8.6/File/HomeDir/MacOS9.pm"
+#line 1
 package File::HomeDir::MacOS9;
 
 # Half-assed implementation for the legacy Mac OS9 operating system.
@@ -11,11 +11,11 @@ use Carp ();
 
 use vars qw{$VERSION};
 BEGIN {
-	$VERSION = '0.58';
+	$VERSION = '0.69';
 }
 
-# If prefork is available, set Mac::Files
-# to be preloaded if needed.
+# Load early if in a forking environment and we have
+# prefork, or at run-time if not.
 eval "use prefork 'Mac::Files'";
 
 
@@ -67,14 +67,6 @@ sub my_desktop {
 	Carp::croak("Could not locate current user's desktop");
 }
 
-sub my_documents {
-	Carp::croak("my_documents is not implemented on Mac OS 9");
-}
-
-sub my_data {
-	Carp::croak("my_data is not implemented on Mac OS 9");
-}
-
 
 
 
@@ -95,19 +87,4 @@ sub users_home {
 	Carp::croak("Failed to find home directory for user '$name'");
 }
 
-sub users_desktop {
-	my ($class, $name) = @_;
-	Carp::croak("users_desktop is not implemented on this platform");
-}
-
-sub users_documents {
-	my ($class, $name) = @_;
-	Carp::croak("users_documents is not implemented on this platform");
-}
-
-sub users_data {
-	my ($class, $name) = @_;
-	Carp::croak("users_data is not implemented on this platform");
-}
-	
 1;

@@ -1,4 +1,4 @@
-#line 1 "inc/File/HomeDir/Unix.pm - /Library/Perl/5.8.6/File/HomeDir/Unix.pm"
+#line 1
 package File::HomeDir::Unix;
 
 # Unix-specific functionality
@@ -9,10 +9,8 @@ use Carp ();
 
 use vars qw{$VERSION};
 BEGIN {
-	$VERSION = '0.58';
+	$VERSION = '0.69';
 }
-
-
 
 
 
@@ -21,29 +19,45 @@ BEGIN {
 
 sub my_home {
 	my $class = shift;
-	return $ENV{HOME} if defined $ENV{HOME};
+	my $home  = $class->_my_home(@_);
+
+	# On Unix in general, a non-existant home means "no home"
+	# For example, "nobody"-like users might use /nonexistant
+	if ( defined $home and ! -d $home ) {
+		$home = undef;
+	}
+
+	return $home;
+}
+
+sub _my_home {
+	my $class = shift;
+	if ( exists $ENV{HOME} and defined $ENV{HOME} ) {
+		return $ENV{HOME};
+	}
 
 	# This is from the original code, but I'm guessing
-	# it means "login directory".
-	return $ENV{LOGDIR} if $ENV{LOGDIR};
+	# it means "login directory" and exists on some Unixes.
+	if ( exists $ENV{LOGDIR} and $ENV{LOGDIR} ) {
+		return $ENV{LOGDIR};
+	}
 
 	### More-desperate methods
 
-	# Light desperation on any platform
+	# Light desperation on any (Unixish) platform
 	SCOPE: {
-		# On some platforms getpwuid dies if called at all
 		my $home = (getpwuid($<))[7];
 		return $home if $home and -d $home;
 	}
 
-	Carp::croak("Could not locate current user's home directory");
+	return undef;
 }
 
+# On unix by default, everything is under the same folder
 sub my_desktop {
-	Carp::croak("The my_desktop is not implemented on this platform");
+	shift->my_home;
 }
 
-# On unix, we keep both data and documents under the same folder
 sub my_documents {
 	shift->my_home;
 }
@@ -52,7 +66,17 @@ sub my_data {
 	shift->my_home;
 }
 
+sub my_music {
+	shift->my_home;
+}
 
+sub my_pictures {
+	shift->my_home;
+}
+
+sub my_videos {
+	shift->my_home;
+}
 
 
 
@@ -62,18 +86,23 @@ sub my_data {
 sub users_home {
 	my ($class, $name) = @_;
 
+	# IF and only if we have getpwuid support, and the
+	# name of the user is our own, shortcut to my_home.
+	# This is needed to handle HOME environment settings.
+	if ( $name eq getpwuid($<) ) {
+		return $class->my_home;
+	}
+
 	SCOPE: {
-		# On some platforms getpwnam dies if called at all
 		my $home = (getpwnam($name))[7];
 		return $home if $home and -d $home;
 	}
 
-	Carp::croak("Failed to find home directory for user '$name'");
+	return undef;
 }
 
 sub users_desktop {
-	my ($class, $name) = @_;
-	Carp::croak("Failed to find desktop for user '$name'");
+	shift->users_home(@_);
 }
 
 sub users_documents {
@@ -84,4 +113,17 @@ sub users_data {
 	shift->users_home(@_);
 }
 
+sub users_music {
+	shift->users_home(@_);
+}
+
+sub users_pictures {
+	shift->users_home(@_);
+}
+
+sub users_videos {
+	shift->users_home(@_);
+}
+
 1;
+

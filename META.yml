@@ -1,20 +1,27 @@
-name: grepmail
-version: 5.3033
-abstract: search mailboxes for mail matching a regular expression
-author: David Coppit <david@coppit.org>
-license: gpl
-distribution_type: module
+---
+abstract: 'search mailboxes for mail matching a regular expression'
+author:
+  - 'David Coppit <david@coppit.org>'
 build_requires:
+  ExtUtils::MakeMaker: 6.42
   Test::More: 0
-requires:
-  perl: 5.004
-  Date::Parse: 0
-  Mail::Mbox::MessageParser: 1.4001
-recommends:
-  Digest::MD5: 0
-  Date::Manip: 0
-  Benchmark::Timer: 0.7100
+configure_requires:
+  ExtUtils::MakeMaker: 6.42
+distribution_type: module
+generated_by: 'Module::Install version 0.91'
+license: gpl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: grepmail
 no_index:
   directory:
     - inc
-generated_by: Module::Install version 0.37
+    - t
+requires:
+  Date::Parse: 0
+  Mail::Mbox::MessageParser: 1.4001
+  perl: 5.005
+resources:
+  license: http://opensource.org/licenses/gpl-license.php
+version: 5.3034

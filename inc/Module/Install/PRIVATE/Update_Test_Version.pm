@@ -1,4 +1,4 @@
-#line 1 "inc/Module/Install/PRIVATE/Update_Test_Version.pm - lib/Module/Install/PRIVATE/Update_Test_Version.pm"
+#line 1
 package Module::Install::PRIVATE::Update_Test_Version;
 
 use strict;
